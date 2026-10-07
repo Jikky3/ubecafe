@@ -55,13 +55,6 @@ export const SEED_PLAN = (() => {
   }));
 })();
 
-/** Deterministic sample texts returned by the simulated OCR step. */
-export const OCR_SAMPLES = [
-  'Title: Kale & Chickpea Power Salad\nServings: 2\nIngredients:\n- 3 cups kale\n- 1 can chickpeas, drained\n- 1/2 cup quinoa\n- 1 red bell pepper\n- 2 tbsp olive oil\n- 1 lemon\n- 2 tbsp pumpkin seeds\nInstructions:\n1. Cook quinoa and let it cool.\n2. Massage kale with oil and lemon.\n3. Toss with chickpeas, pepper, quinoa and seeds.',
-  'Title: Sheet-Pan Salmon & Sweet Potato\nServes 2\nIngredients\n• 2 salmon fillets (6 oz each)\n• 2 sweet potatoes\n• 2 cups broccoli\n• 1 tbsp olive oil\n• 1/2 tsp black pepper\nDirections\n1. Cube the sweet potatoes and roast 15 minutes at 220°C.\n2. Add salmon and broccoli; roast 12 minutes more.',
-  'Title: Peanut Butter Banana Oat Smoothie\nServings: 1\nIngredients:\n- 1 banana\n- 1 cup milk\n- 1/4 cup rolled oats\n- 1 tbsp peanut butter\n- 1 tsp chia seeds\nInstructions:\n1. Blend everything until smooth.',
-];
-
 export const DEFAULT_PROFILE = {
   units: 'imperial', age: 32, gender: 'female', heightCm: 167.64, weightKg: 68.04,
   activity: 'moderate', goal: 'maintain', bodyFatPct: null, waistCm: null, hipCm: null, updatedAt: null,

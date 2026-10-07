@@ -10,6 +10,7 @@
     "start": "node tools/serve.js",
     "test": "node --test \"tests/**/*.test.js\"",
     "test:browser": "node tools/browser-check.js",
+    "test:ocr": "node tools/ocr-check.js",
     "lint:html": "html-validate index.html"
   },
   "devDependencies": {

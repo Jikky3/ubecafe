@@ -1,7 +1,7 @@
 import { DAYS, MEAL_SLOTS } from '../data/constants.js';
 import { FOOD_DB } from '../data/foods.js';
-import { OCR_SAMPLES } from '../data/seeds.js';
 import { RecipeParser } from '../engines/recipe-parser.js';
+import { OcrUI } from './ocr.js';
 import { App } from '../main.js';
 import { state } from '../state.js';
 import { Storage } from '../storage.js';
@@ -9,7 +9,6 @@ import { $, announce, createId, escapeHTML, fmt } from '../util.js';
 
 export const RecipeUI = {
   form: null,
-  previewUrl: null,
 
   init() {
     this.form = $('#recipe-form');
@@ -21,6 +20,8 @@ export const RecipeUI = {
       e.preventDefault();
       this.save();
     });
+
+    OcrUI.init((text) => this.applyOcrText(text));
 
     // Custom drop zone: role="button" + Enter/Space keyboard support.
     const zone = $('#ocr-dropzone');
@@ -86,36 +87,20 @@ export const RecipeUI = {
     $('#recipe-title').focus();
   },
 
-  /** Simulated OCR: deterministic sample text chosen from the file size, revealed in progress steps. */
+  /** Photo OCR runs on this device (see js/ui/ocr.js); the recognized text is parsed like pasted text. */
   handleImage(file) {
-    const status = $('#ocr-status');
-    const progress = $('#ocr-progress');
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      status.textContent = 'That file is not an image. Choose a JPG, PNG, WebP or HEIC photo.';
+    OcrUI.scan(file);
+  },
+
+  /** Puts OCR text in the raw box for review, then parses it into the form when headings were found. */
+  applyOcrText(text) {
+    $('#raw-recipe').value = text;
+    if (!RecipeParser.parseRecipeText(text).ingredientsText) {
+      announce('Text was read, but no “Ingredients” heading was found. Edit the raw text, add the headings, then choose Parse into form.');
+      $('#raw-recipe').focus();
       return;
     }
-    if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
-    this.previewUrl = URL.createObjectURL(file);
-    const preview = $('#ocr-preview');
-    preview.src = this.previewUrl;
-    preview.alt = `Uploaded recipe photo: ${file.name}`;
-    preview.hidden = false;
-
-    const steps = [[20, 'Detecting text regions…'], [55, 'Recognizing characters…'], [85, 'Structuring recipe sections…'], [100, 'Done']];
-    progress.hidden = false;
-    steps.forEach(([value, label], i) => {
-      window.setTimeout(() => {
-        progress.value = value;
-        status.textContent = `${label} ${value}%`;
-        if (value === 100) {
-          $('#raw-recipe').value = OCR_SAMPLES[file.size % OCR_SAMPLES.length];
-          progress.hidden = true;
-          status.textContent = 'Text extracted (simulated). Fields have been pre-filled below for review.';
-          this.parseRaw();
-        }
-      }, (i + 1) * 400);
-    });
+    this.parseRaw();
   },
 
   renderAnalysis(recipe) {
