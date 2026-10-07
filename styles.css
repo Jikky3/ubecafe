@@ -654,6 +654,8 @@ textarea {
 
 input[type="text"],
 input[type="number"],
+input[type="email"],
+input[type="password"],
 select,
 textarea {
   width: 100%;
@@ -774,6 +776,60 @@ textarea {
 
 .account-status:focus {
   outline: none;
+}
+
+.backup-grid {
+  display: grid;
+  gap: var(--space-5);
+}
+
+input[type="file"] {
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--space-2);
+  background: var(--bg);
+  border: 1px dashed var(--ink-muted);
+  border-radius: var(--radius-sm);
+}
+
+input[type="file"]::file-selector-button {
+  min-height: calc(var(--tap) - 2 * var(--space-2));
+  margin-right: var(--space-3);
+  padding: var(--space-1) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.import-review {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  border-radius: var(--radius-sm);
+}
+
+.import-review:focus-visible {
+  outline: 3px solid var(--focus);
+}
+
+.import-review h4 {
+  font-size: var(--step-1);
+}
+
+.import-review__list {
+  display: grid;
+  gap: var(--space-1);
+  padding-left: var(--space-5);
+  list-style: disc;
+}
+
+.import-review__warning {
+  font-weight: 500;
 }
 
 #logged-in-view {
@@ -1288,6 +1344,11 @@ textarea {
   .planner-grid,
   .grocery-grid {
     grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  }
+
+  .backup-grid {
+    grid-template-columns: repeat(2, 1fr);
+    align-items: start;
   }
 
   .site-footer__inner {

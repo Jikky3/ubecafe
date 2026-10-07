@@ -3,6 +3,7 @@ import { AccountManager } from '../engines/accounts.js';
 import { App } from '../main.js';
 import { loadUserData, saveUserData, state } from '../state.js';
 import { Storage } from '../storage.js';
+import { BackupUI } from './backup.js';
 
 export const AccountUI = {
   email: null,
@@ -119,5 +120,6 @@ export const AccountUI = {
     $('#logged-in-view').hidden = !signedIn;
     $('#display-user-email').textContent = this.email ?? '';
     $('#account-chip-label').textContent = signedIn ? this.email : 'Sign in';
+    BackupUI.renderOwner();
   },
 };

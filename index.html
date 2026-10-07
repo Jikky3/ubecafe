@@ -27,6 +27,8 @@
   <meta name="twitter:description" content="Rule-based meal planning: macro targets, micronutrient dashboard, food recommendations with reasons, supplement timing and grocery lists.">
 
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 26C6 12 16 4 28 4c0 12-8 22-22 22z' fill='%234a5a32'/%3E%3Cpath d='M6 26 22 10' stroke='%23f4efe4' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap">
@@ -62,7 +64,9 @@
           "Meal timeline and supplement timing optimizer",
           "Weekly grocery list grouped by store aisle",
           "Optional body composition: BMI, waist-to-hip and waist-to-height ratios, lean body mass",
-          "Private on-device accounts with separate profiles and meal plans"
+          "Private on-device accounts with separate profiles and meal plans",
+          "Export and import of all data, with optional passphrase-encrypted backups",
+          "Installable offline web app"
         ]
       },
       {
@@ -158,6 +162,7 @@
         <li><a href="#schedule">Schedule</a></li>
         <li><a href="#recipes">Recipes</a></li>
         <li><a href="#grocery">Grocery List</a></li>
+        <li><a href="#backup">Backup</a></li>
       </ul>
     </nav>
   </header>
@@ -216,6 +221,68 @@
           <div class="button-row">
             <button type="button" class="btn btn--secondary" id="btn-logout">Sign out</button>
             <button type="button" class="btn btn--ghost btn--danger" id="btn-delete-account">Delete account</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 0b. Backup & restore -->
+    <section id="backup" class="section" aria-labelledby="backup-heading">
+      <header class="section__header">
+        <h2 id="backup-heading" class="section__title" tabindex="-1">Back up <em>&amp; restore</em></h2>
+        <p class="section__intro">Save everything for <strong data-backup-owner>this guest profile</strong> (profile, recipes, meal plan, supplements and grocery checks) to a file you keep, then restore it on this or another device. The file is created on your device and goes nowhere unless you move it.</p>
+        <p id="storage-status" class="section__intro field__hint"></p>
+      </header>
+
+      <div class="backup-grid">
+        <div class="card">
+          <h3 id="export-heading">Download a backup</h3>
+          <form id="export-form" class="form" novalidate aria-labelledby="export-heading">
+            <div class="check">
+              <input type="checkbox" id="export-encrypt" aria-controls="export-passphrase-fields">
+              <label for="export-encrypt">Protect the file with a passphrase</label>
+            </div>
+            <div id="export-passphrase-fields" class="form" hidden>
+              <div class="field">
+                <label for="export-passphrase">Passphrase <span class="field__hint">(at least 8 characters)</span></label>
+                <input type="password" id="export-passphrase" autocomplete="new-password" minlength="8" aria-describedby="export-passphrase-hint export-passphrase-error">
+                <p id="export-passphrase-hint" class="field__hint">The file is encrypted with AES-GCM using a key stretched from this passphrase. Your account password works if you will remember it. A forgotten passphrase cannot be recovered.</p>
+                <p id="export-passphrase-error" class="field-error"></p>
+              </div>
+              <div class="field">
+                <label for="export-passphrase-confirm">Confirm passphrase</label>
+                <input type="password" id="export-passphrase-confirm" autocomplete="new-password" aria-describedby="export-passphrase-confirm-error">
+                <p id="export-passphrase-confirm-error" class="field-error"></p>
+              </div>
+            </div>
+            <button type="submit" class="btn btn--primary btn--block" id="btn-export">Download backup</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3 id="import-heading">Restore from a backup</h3>
+          <form id="import-form" class="form" novalidate aria-labelledby="import-heading">
+            <div class="field">
+              <label for="import-file">Backup file <span class="field__hint">(.json from Ube Café)</span></label>
+              <input type="file" id="import-file" accept=".json,application/json" aria-describedby="import-file-error">
+              <p id="import-file-error" class="field-error"></p>
+            </div>
+            <div class="field" id="import-passphrase-field" hidden>
+              <label for="import-passphrase">Passphrase for this backup</label>
+              <input type="password" id="import-passphrase" autocomplete="off" aria-describedby="import-passphrase-error">
+              <p id="import-passphrase-error" class="field-error"></p>
+            </div>
+            <button type="submit" class="btn btn--secondary btn--block" id="btn-import-check">Check backup</button>
+          </form>
+
+          <div id="import-review" class="import-review" tabindex="-1" role="group" aria-labelledby="import-review-heading" hidden>
+            <h4 id="import-review-heading">This backup contains</h4>
+            <ul id="import-summary" class="import-review__list"></ul>
+            <p class="import-review__warning">Restoring replaces all current data for <strong data-backup-owner>this guest profile</strong> on this device. This cannot be undone, so download a backup first if you are unsure.</p>
+            <div class="button-row">
+              <button type="button" class="btn btn--primary" id="btn-import-confirm">Replace my data</button>
+              <button type="button" class="btn btn--ghost" id="btn-import-cancel">Cancel</button>
+            </div>
           </div>
         </div>
       </div>

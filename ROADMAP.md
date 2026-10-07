@@ -104,10 +104,10 @@ Goal: numbers a dietitian would accept.
 
 Goal: never lose a user's work.
 
-- [ ] Add a `schemaVersion` and a migration step on load.
-- [ ] Export / import of all user data as a JSON file, plus an optional encrypted backup (Web Crypto AES-GCM with a key derived from the account password).
-- [ ] Move storage from `localStorage` to IndexedDB, which allows more data and partial updates.
-- [ ] Make it an installable offline PWA (web app manifest and a service worker).
+- [x] Add a `schemaVersion` and a migration step on load.
+- [x] Export / import of all user data as a JSON file, plus an optional encrypted backup (Web Crypto AES-GCM with a key derived from a passphrase, which can be the account password).
+- [x] Move storage from `localStorage` to IndexedDB, which allows more data and partial updates.
+- [x] Make it an installable offline PWA (web app manifest and a service worker).
 
 ### Phase 3 — A smarter planner (4–6 weeks)
 
