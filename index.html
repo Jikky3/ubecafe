@@ -532,6 +532,15 @@
     <p class="site-footer__copy">© <span id="year">2026</span> Ube Café. Nutrient data adapted from USDA FoodData Central.</p>
   </footer>
 
+  <dialog id="recipe-dialog" class="recipe-dialog" aria-labelledby="recipe-view-title">
+    <div class="recipe-dialog__bar">
+      <button type="button" class="btn btn--ghost" data-dialog-action="edit">Edit recipe</button>
+      <button type="button" class="btn btn--ghost" data-dialog-action="print">Print</button>
+      <button type="button" class="btn btn--secondary" data-dialog-action="close">Close<span class="sr-only"> recipe</span></button>
+    </div>
+    <div id="recipe-dialog-body" class="recipe-view"></div>
+  </dialog>
+
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

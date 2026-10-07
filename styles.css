@@ -1381,3 +1381,253 @@ textarea {
     outline: 2px solid Highlight;
   }
 }
+
+/* ---------- Recipe links & viewer ---------- */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--accent);
+}
+
+.btn--small {
+  min-height: 36px;
+  padding: 0.3rem 0.8rem;
+  font-size: var(--step--1);
+}
+
+.plan-slot {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.plan-slot select {
+  flex: 1;
+  min-width: 0;
+}
+
+.bar--slim {
+  height: 6px;
+}
+
+.rec__gap {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.rec__gap-text {
+  margin: 0;
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums;
+}
+
+.rec__section {
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--line);
+}
+
+.card .rec__subhead {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.rec__meals {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rec__meals .link-button {
+  font-weight: 600;
+}
+
+.rec__amount {
+  display: block;
+  color: var(--ink-muted);
+  font-size: var(--step--1);
+}
+
+.chip {
+  display: inline-block;
+  margin: 0 var(--space-1) var(--space-1) 0;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+  font-size: var(--step--1);
+  font-weight: 600;
+}
+
+.chip__pct {
+  font-weight: 400;
+}
+
+.recipe-dialog {
+  width: min(100% - 2 * var(--gutter), 52rem);
+  max-height: calc(100dvh - 2 * var(--gutter));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.recipe-dialog::backdrop {
+  background: rgb(26 28 21 / 0.55);
+}
+
+.recipe-dialog__bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.recipe-view {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-6);
+}
+
+.recipe-view__header .eyebrow {
+  margin-bottom: var(--space-2);
+}
+
+.recipe-view__title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-serif);
+  font-size: var(--step-3);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.recipe-view__planned,
+.recipe-view__highlights {
+  margin: var(--space-2) 0 0;
+}
+
+.recipe-view__context {
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.recipe-view__context h3 {
+  margin: 0 0 var(--space-2);
+}
+
+.recipe-view__context ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.recipe-view__columns {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.recipe-view__columns h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+
+.cook-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cook-list .check {
+  align-items: flex-start;
+  border-bottom: 1px dashed var(--line);
+}
+
+.cook-list .check input {
+  margin-top: 0.7rem;
+}
+
+.cook-list input:checked + label {
+  color: var(--ink-muted);
+  text-decoration: line-through;
+}
+
+.cook-step__num {
+  font-weight: 600;
+}
+
+.cook-progress {
+  font-family: var(--font-sans);
+  font-size: var(--step--1);
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+
+.recipe-view__details summary {
+  min-height: var(--tap);
+  padding-block: var(--space-2);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (min-width: 48em) {
+  .recipe-view {
+    padding-inline: var(--space-6);
+  }
+
+  .recipe-view__columns {
+    grid-template-columns: 2fr 3fr;
+  }
+}
+
+@media print {
+  body:has(.recipe-dialog[open]) > :not(.recipe-dialog) {
+    display: none !important;
+  }
+
+  .recipe-dialog[open] {
+    position: static;
+    width: auto;
+    max-height: none;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .recipe-dialog__bar {
+    display: none;
+  }
+}
+
+/* The title receives focus programmatically when the dialog opens; no ring needed. */
+.recipe-view__title:focus {
+  outline: none;
+}

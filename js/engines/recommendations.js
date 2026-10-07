@@ -17,6 +17,7 @@ export class RecommendationEngine {
     const add = (key, food, reason) => {
       const r = ratio(key);
       recs.push({
+        key,
         food,
         reason,
         trigger: `${NUTRIENT_BY_KEY[key].label} at ${Math.round(r * 100)}% of ${NUTRIENT_BY_KEY[key].isLimit ? 'your daily limit' : 'target'}`,

@@ -36,7 +36,7 @@ export const ScheduleUI = {
       const meal = meals[slot.id];
       const tips = ScheduleOptimizer.mealTips(slot.id, meal, coffeeAtBreakfast);
       const mealText = meal
-        ? `<p class="timeline__meal">${escapeHTML(meal.recipe.title)}</p>
+        ? `<p class="timeline__meal"><button type="button" class="link-button" data-view-recipe="${escapeHTML(meal.recipe.id)}" data-day="${state.viewDay}" data-slot="${slot.id}">${escapeHTML(meal.recipe.title)}</button></p>
            <p class="timeline__meta">${fmt(meal.nutrients.calories)} kcal · ${fmt(meal.nutrients.protein)} g protein · ${fmt(meal.nutrients.fat)} g fat · ${fmt(meal.nutrients.vitaminC)} mg vitamin C</p>`
         : '<p class="timeline__meal timeline__meal--empty">No meal planned</p>';
       const supps = schedule[slot.id].length

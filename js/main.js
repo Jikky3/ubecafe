@@ -5,6 +5,7 @@ import { DashboardUI } from './ui/dashboard.js';
 import { GroceryUI } from './ui/grocery.js';
 import { PlannerUI } from './ui/planner.js';
 import { ProfileUI } from './ui/profile.js';
+import { RecipeView } from './ui/recipe-view.js';
 import { RecipeUI } from './ui/recipes.js';
 import { RecommendationsUI } from './ui/recommendations.js';
 import { ScheduleUI } from './ui/schedule.js';
@@ -20,8 +21,10 @@ export const App = {
     RecipeUI.init();
     PlannerUI.init();
     GroceryUI.init();
+    RecipeView.init();
     $('#year').textContent = String(new Date().getFullYear());
     this.renderRecipesChanged();
+    RecipeView.openFromHash();
   },
 
   /** Swaps in the active scope's data (after sign-in / sign-out) and refreshes every view. */
