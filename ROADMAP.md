@@ -98,13 +98,13 @@ Goal: make the project safe to change.
 
 Goal: numbers a dietitian would accept.
 
-- [ ] Move the food table into `data/foods.json` with a documented schema: id, name, aliases, aisle, per-100 g nutrients, portion weights, and a `source` field (USDA FoodData Central `fdcId`).
-- [ ] Add separate raw/dry and cooked entries (rice, pasta, quinoa, lentils, beans) and detect "cooked" in ingredient lines.
-- [ ] Split conflated entries: plant milks, coconut milk, feta vs cheddar, maple syrup vs honey, lime vs lemon, chili flakes vs bell pepper.
-- [ ] Match whole phrases first and block false hits like "butter beans" → butter.
-- [ ] Grow the table to roughly 300 common foods, generated from FoodData Central by a script that's checked into the repo, rather than typed in by hand.
-- [ ] Track **sodium** and **saturated fat** as limits, with dashboard bars and recommendation rules.
-- [ ] Unmatched ingredients: show a clear warning on each line, and let the user pick a matching food or enter custom values.
+- [x] Move the food table into a documented schema (`js/data/foods.js`; still a JS module, no build step): id, name, aliases, aisle, per-100 g nutrients, portion weights, and a `source` field (USDA FoodData Central `fdcId`).
+- [x] Add separate raw/dry and cooked entries (rice, pasta, quinoa, lentils, beans) and detect "cooked" in ingredient lines.
+- [x] Split conflated entries: plant milks, coconut milk, feta vs cheddar, maple syrup vs honey, lime vs lemon, chili flakes vs bell pepper.
+- [x] Match whole phrases first and block false hits like "butter beans" → butter.
+- [ ] Grow the table to roughly 300 common foods, generated from FoodData Central by a script that's checked into the repo, rather than typed in by hand. _(177 foods so far, transcribed by hand from SR Legacy without FDC IDs; the generator script is still to do.)_
+- [x] Track **sodium** and **saturated fat** as limits, with dashboard bars and recommendation rules.
+- [x] Unmatched ingredients: show a clear warning on each line, and let the user pick a matching food or enter custom values.
 
 ### Phase 2 — Durable, portable data (2–3 weeks)
 
