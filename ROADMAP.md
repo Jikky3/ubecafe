@@ -124,7 +124,7 @@ Goal: from tracking what you planned to helping you plan.
 
 Each of these needs a deliberate decision about the privacy promise.
 
-- [ ] Real photo-to-text with an in-browser OCR library such as Tesseract.js, so images still never leave the device.
+- [x] Real photo-to-text with an in-browser OCR library such as Tesseract.js, so images still never leave the device.
 - [ ] Import recipes from a URL by reading schema.org `Recipe` data. This needs a fetch proxy, which weakens the no-server promise.
 - [ ] Optional end-to-end-encrypted sync across a user's devices.
 - [ ] Translations into other languages, and metric-first regional defaults.

@@ -56,7 +56,7 @@
           "Protein, carbohydrate, fat and sugar targets by goal",
           "RDA targets for vitamin A, C, D, B12, calcium, iron, potassium, magnesium, zinc, fiber and omega-3",
           "Daily macro and micronutrient progress dashboard with deficiency badges",
-          "Recipe text importer and simulated photo OCR",
+          "Recipe text importer and on-device photo OCR (Tesseract.js)",
           "Ingredient parser with embedded nutrition dictionary",
           "Rule-based food recommendations with reasons",
           "Meal timeline and supplement timing optimizer",
@@ -449,8 +449,12 @@
             <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="32" height="32"><path d="M4 7h3l2-3h6l2 3h3v13H4z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
             <span class="dropzone__title">Choose or drop a photo</span>
           </div>
-          <p id="ocr-hint" class="field__hint">Simulated OCR for demonstration: your image never leaves this device, and a sample recipe text is extracted.</p>
+          <p id="ocr-hint" class="field__hint">Text is read on your device by Tesseract.js in a background worker: your photo is never uploaded. The first scan downloads about 5&nbsp;MB of OCR engine and English language data from jsDelivr, which your browser then keeps. Clear, printed recipes in English work best.</p>
           <input type="file" id="ocr-file" accept="image/*" hidden>
+          <div class="button-row ocr-actions">
+            <button type="button" id="ocr-sample" class="btn btn--ghost">Try a sample photo</button>
+            <button type="button" id="ocr-cancel" class="btn btn--ghost" hidden>Cancel scan</button>
+          </div>
           <label for="ocr-progress" class="sr-only">Text extraction progress</label>
           <progress id="ocr-progress" max="100" value="0" hidden></progress>
           <p id="ocr-status" class="ocr-status" role="status" aria-live="polite"></p>
