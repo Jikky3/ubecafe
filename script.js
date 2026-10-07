@@ -10,7 +10,8 @@
  *  5. RecommendationEngine– if/else "which food & why" rules
  *  6. ScheduleOptimizer   – meal timeline + supplement timing rules
  *  7. GroceryAggregator   – weekly ingredient roll-up grouped by aisle
- *  8. UI controllers      – rendering and accessible event handling
+ *  8. AccountManager      – local multi-user accounts (PBKDF2-hashed passwords)
+ *  9. UI controllers      – rendering and accessible event handling
  */
 'use strict';
 
@@ -244,8 +245,10 @@ const OCR_SAMPLES = [
 
 const DEFAULT_PROFILE = {
   units: 'imperial', age: 32, gender: 'female', heightCm: 167.64, weightKg: 68.04,
-  activity: 'moderate', goal: 'maintain',
+  activity: 'moderate', goal: 'maintain', bodyFatPct: null, waistCm: null, hipCm: null, updatedAt: null,
 };
+const DEFAULT_SUPPLEMENTS = { selected: ['vitaminD3', 'iron', 'magnesium'], coffeeAtBreakfast: true };
+const DEFAULT_GROCERY = { household: 1, checked: [] };
 
 /* =========================================================
  * 2. Utilities & Storage
@@ -272,6 +275,11 @@ const createId = () => `r-${Date.now().toString(36)}-${Math.random().toString(36
 
 const todayKey = () => DAYS[(new Date().getDay() + 6) % 7];
 
+/**
+ * localStorage wrapper. User data keys are namespaced per signed-in account
+ * ("ubecafe.user:<email>.plan"); guests use the bare keys. Device-wide keys
+ * (theme, account registry, session) are never namespaced.
+ */
 const Storage = {
   KEYS: {
     profile: 'ubecafe.profile',
@@ -280,10 +288,18 @@ const Storage = {
     supplements: 'ubecafe.supplements',
     grocery: 'ubecafe.grocery',
     theme: 'ubecafe.theme',
+    accounts: 'ubecafe.accounts',
+    session: 'ubecafe.session',
+  },
+  GLOBAL_KEYS: new Set(['ubecafe.theme', 'ubecafe.accounts', 'ubecafe.session']),
+  scope: null,
+
+  resolve(key) {
+    return this.scope && !this.GLOBAL_KEYS.has(key) ? key.replace('ubecafe.', `ubecafe.user:${this.scope}.`) : key;
   },
   load(key, fallback) {
     try {
-      const raw = localStorage.getItem(key);
+      const raw = localStorage.getItem(this.resolve(key));
       return raw ? JSON.parse(raw) : fallback;
     } catch {
       return fallback;
@@ -291,9 +307,25 @@ const Storage = {
   },
   save(key, value) {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(this.resolve(key), JSON.stringify(value));
     } catch {
       /* Storage blocked (private mode / quota): the app keeps working in memory. */
+    }
+  },
+  remove(key) {
+    try {
+      localStorage.removeItem(this.resolve(key));
+    } catch {
+      /* Nothing to remove when storage is unavailable. */
+    }
+  },
+  /** Deletes every key belonging to one account. */
+  removeScope(scope) {
+    try {
+      const prefix = `ubecafe.user:${scope}.`;
+      Object.keys(localStorage).filter((k) => k.startsWith(prefix)).forEach((k) => localStorage.removeItem(k));
+    } catch {
+      /* Nothing to remove when storage is unavailable. */
     }
   },
 };
@@ -344,6 +376,36 @@ class BiometricsEngine {
         ...this.micronutrientRDA(profile.age, profile.gender),
       },
     };
+  }
+
+  /**
+   * Optional body-composition indicators (WHO cut-offs).
+   * BMI always; waist-to-hip and waist-to-height when tape measurements exist;
+   * lean mass and Katch-McArdle BMR when body fat % is known.
+   */
+  static bodyComposition({ heightCm, weightKg, gender, bodyFatPct, waistCm, hipCm }) {
+    const bmi = weightKg / (heightCm / 100) ** 2;
+    let bmiCategory = 'Obesity';
+    if (bmi < 18.5) bmiCategory = 'Underweight';
+    else if (bmi < 25) bmiCategory = 'Healthy range';
+    else if (bmi < 30) bmiCategory = 'Overweight';
+
+    const result = { bmi, bmiCategory };
+    if (waistCm && hipCm) {
+      const whrLimit = { male: 0.9, female: 0.85, other: 0.875 }[gender];
+      result.waistToHip = waistCm / hipCm;
+      result.waistToHipRisk = result.waistToHip >= whrLimit ? 'Increased risk' : 'Low risk';
+      result.waistToHipLimit = whrLimit;
+    }
+    if (waistCm) {
+      result.waistToHeight = waistCm / heightCm;
+      result.waistToHeightRisk = result.waistToHeight >= 0.5 ? 'Increased risk' : 'Low risk';
+    }
+    if (bodyFatPct) {
+      result.leanMassKg = weightKg * (1 - bodyFatPct / 100);
+      result.katchBmr = 370 + 21.6 * result.leanMassKg;
+    }
+    return result;
   }
 
   /** NIH Dietary Reference Intakes (RDA / AI) by age and sex. */
@@ -757,15 +819,101 @@ class GroceryAggregator {
 }
 
 /* =========================================================
- * 8. Application state & UI controllers
+ * 8. AccountManager – local, per-device user accounts
+ *
+ * Accounts let several people share one browser with separate profiles,
+ * recipes and plans. Credentials never leave the device: each password is
+ * salted and stretched with PBKDF2-SHA-256 (Web Crypto) and only the hash is
+ * stored. This is privacy separation, not server-grade security: anyone with
+ * access to the browser's storage can read the (unencrypted) nutrition data.
  * ======================================================= */
 
-const state = {
-  profile: Storage.load(Storage.KEYS.profile, DEFAULT_PROFILE),
+class AccountManager {
+  static ITERATIONS = 210000; // OWASP 2023 recommendation for PBKDF2-HMAC-SHA256
+
+  static normalize(email) {
+    return email.trim().toLowerCase();
+  }
+
+  static registry() {
+    return Storage.load(Storage.KEYS.accounts, {});
+  }
+
+  static toBase64(buffer) {
+    return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+  }
+
+  static fromBase64(text) {
+    return Uint8Array.from(atob(text), (ch) => ch.charCodeAt(0));
+  }
+
+  static async derive(password, salt, iterations) {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256);
+    return this.toBase64(bits);
+  }
+
+  /**
+   * Signs in to an existing account (verifying the password) or creates a new one.
+   * @returns {Promise<{email: string, created: boolean}>}
+   * @throws {Error} message 'unsupported' | 'wrong-password'
+   */
+  static async signInOrCreate(rawEmail, password) {
+    if (!window.crypto?.subtle) throw new Error('unsupported');
+    const email = this.normalize(rawEmail);
+    const accounts = this.registry();
+    const existing = accounts[email];
+
+    if (existing) {
+      const hash = await this.derive(password, this.fromBase64(existing.salt), existing.iterations);
+      if (hash !== existing.hash) throw new Error('wrong-password');
+      return { email, created: false };
+    }
+
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    accounts[email] = {
+      salt: this.toBase64(salt),
+      hash: await this.derive(password, salt, this.ITERATIONS),
+      iterations: this.ITERATIONS,
+      createdAt: new Date().toISOString(),
+    };
+    Storage.save(Storage.KEYS.accounts, accounts);
+    return { email, created: true };
+  }
+
+  static restoreSession() {
+    const email = Storage.load(Storage.KEYS.session, null);
+    return email && this.registry()[email] ? email : null;
+  }
+
+  static deleteAccount(email) {
+    const accounts = this.registry();
+    delete accounts[email];
+    Storage.save(Storage.KEYS.accounts, accounts);
+    Storage.removeScope(email);
+  }
+}
+
+/* =========================================================
+ * 9. Application state & UI controllers
+ * ======================================================= */
+
+/** Reads the active scope's (guest or account) data, falling back to seeds. */
+const loadUserData = () => ({
+  profile: { ...DEFAULT_PROFILE, ...Storage.load(Storage.KEYS.profile, {}) },
   recipes: Storage.load(Storage.KEYS.recipes, SEED_RECIPES),
   plan: Storage.load(Storage.KEYS.plan, SEED_PLAN),
-  supplements: Storage.load(Storage.KEYS.supplements, { selected: ['vitaminD3', 'iron', 'magnesium'], coffeeAtBreakfast: true }),
-  grocery: Storage.load(Storage.KEYS.grocery, { household: 1, checked: [] }),
+  supplements: Storage.load(Storage.KEYS.supplements, DEFAULT_SUPPLEMENTS),
+  grocery: Storage.load(Storage.KEYS.grocery, DEFAULT_GROCERY),
+});
+
+/** Writes all user data to the active scope (used when a new account adopts guest data). */
+const saveUserData = () => {
+  ['profile', 'recipes', 'plan', 'supplements', 'grocery'].forEach((key) => Storage.save(Storage.KEYS[key], state[key]));
+};
+
+const state = {
+  ...loadUserData(),
   viewDay: todayKey(),
   editingId: null,
 };
@@ -786,6 +934,8 @@ const mealsForDay = (day) => {
 
 const ProfileUI = {
   form: null,
+  /** Tape-measure limits per unit system (waist & hip share the same range). */
+  LENGTH_LIMITS: { metric: { min: 40, max: 200, step: 0.1, label: 'cm' }, imperial: { min: 16, max: 80, step: 0.1, label: 'in' } },
 
   init() {
     this.form = $('#profile-form');
@@ -801,6 +951,7 @@ const ProfileUI = {
 
   fill(profile) {
     const f = this.form.elements;
+    const toLength = (cm) => (cm ? Math.round((profile.units === 'metric' ? cm : cm / 2.54) * 10) / 10 : '');
     f.units.value = profile.units;
     f.age.value = profile.age;
     f.gender.value = profile.gender;
@@ -812,22 +963,35 @@ const ProfileUI = {
     f['height-ft'].value = Math.floor(totalInches / 12);
     f['height-in'].value = Math.round((totalInches % 12) * 10) / 10;
     f['weight-lb'].value = Math.round((profile.weightKg / 0.45359237) * 10) / 10;
+    f['body-fat'].value = profile.bodyFatPct ?? '';
+    f.waist.value = toLength(profile.waistCm);
+    f.hip.value = toLength(profile.hipCm);
     this.toggleUnitFields(profile.units);
+    this.renderSavedNote(profile);
   },
 
   toggleUnitFields(units) {
     this.form.querySelectorAll('[data-units]').forEach((group) => {
       group.hidden = group.dataset.units !== units;
     });
+    const limits = this.LENGTH_LIMITS[units];
+    this.form.querySelectorAll('[data-length]').forEach((input) => {
+      Object.assign(input, { min: limits.min, max: limits.max, step: limits.step });
+    });
+    this.form.querySelectorAll('[data-length-unit]').forEach((el) => { el.textContent = `(${limits.label})`; });
   },
 
   /** Converts the visible values so switching units never loses data. */
   switchUnits(units) {
     const f = this.form.elements;
+    const convertLength = (input, factor) => {
+      if (Number(input.value) > 0) input.value = Math.round(Number(input.value) * factor * 10) / 10;
+    };
     if (units === 'metric') {
       const inches = Number(f['height-ft'].value) * 12 + Number(f['height-in'].value);
       if (inches > 0) f['height-cm'].value = Math.round(inches * 25.4) / 10;
       if (Number(f['weight-lb'].value) > 0) f['weight-kg'].value = Math.round(Number(f['weight-lb'].value) * 4.5359237) / 10;
+      [f.waist, f.hip].forEach((input) => convertLength(input, 2.54));
     } else {
       const cm = Number(f['height-cm'].value);
       if (cm > 0) {
@@ -836,11 +1000,12 @@ const ProfileUI = {
         f['height-in'].value = Math.round((inches % 12) * 10) / 10;
       }
       if (Number(f['weight-kg'].value) > 0) f['weight-lb'].value = Math.round((Number(f['weight-kg'].value) / 0.45359237) * 10) / 10;
+      [f.waist, f.hip].forEach((input) => convertLength(input, 1 / 2.54));
     }
     this.toggleUnitFields(units);
   },
 
-  /** Validates visible numeric fields, wiring inline errors to inputs. */
+  /** Validates visible numeric fields; optional fields may be left blank. */
   validate() {
     const inputs = [...this.form.querySelectorAll('input[type="number"]')]
       .filter((input) => !input.closest('[hidden]'));
@@ -848,9 +1013,10 @@ const ProfileUI = {
     inputs.forEach((input) => {
       const error = $(`#${input.id}-error`);
       const value = Number(input.value);
-      const valid = input.value !== '' && value >= Number(input.min) && value <= Number(input.max);
+      const blankOptional = input.value === '' && !input.required;
+      const valid = blankOptional || (input.value !== '' && value >= Number(input.min) && value <= Number(input.max));
       input.setAttribute('aria-invalid', String(!valid));
-      error.textContent = valid ? '' : `Enter a number between ${input.min} and ${input.max}.`;
+      error.textContent = valid ? '' : `Enter a number between ${input.min} and ${input.max}${input.required ? '' : ', or leave it blank'}.`;
       if (!valid && !firstInvalid) firstInvalid = input;
     });
     return firstInvalid;
@@ -865,6 +1031,8 @@ const ProfileUI = {
     }
     const f = this.form.elements;
     const units = f.units.value;
+    const optional = (input, factor = 1) => (input.value === '' ? null : Math.round(Number(input.value) * factor * 10) / 10);
+    const lengthFactor = units === 'metric' ? 1 : 2.54;
     state.profile = {
       units,
       age: Number(f.age.value),
@@ -875,10 +1043,48 @@ const ProfileUI = {
         ? Number(f['height-cm'].value)
         : (Number(f['height-ft'].value) * 12 + Number(f['height-in'].value)) * 2.54,
       weightKg: units === 'metric' ? Number(f['weight-kg'].value) : Number(f['weight-lb'].value) * 0.45359237,
+      bodyFatPct: optional(f['body-fat']),
+      waistCm: optional(f.waist, lengthFactor),
+      hipCm: optional(f.hip, lengthFactor),
+      updatedAt: new Date().toISOString(),
     };
     Storage.save(Storage.KEYS.profile, state.profile);
+    this.renderSavedNote(state.profile);
     App.renderNutrition();
-    announce(`Targets updated: ${fmt(currentTargets().targets.calories)} calories per day.`);
+    const where = AccountUI.email ? ` to ${AccountUI.email}` : ' on this device';
+    announce(`Profile saved${where}. Targets updated: ${fmt(currentTargets().targets.calories)} calories per day.`);
+  },
+
+  renderSavedNote(profile) {
+    const note = $('#profile-saved');
+    if (!profile.updatedAt) {
+      note.textContent = '';
+      return;
+    }
+    const when = new Date(profile.updatedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    note.textContent = `Last saved ${when}${AccountUI.email ? ` to ${AccountUI.email}` : ' as guest'}.`;
+  },
+
+  renderBodyComposition() {
+    const c = BiometricsEngine.bodyComposition(state.profile);
+    const metric = state.profile.units === 'metric';
+    const rows = [['BMI', fmt(c.bmi), c.bmiCategory]];
+    if (c.waistToHip) rows.push(['Waist-to-hip ratio', c.waistToHip.toFixed(2), `${c.waistToHipRisk} (WHO cut-off ${c.waistToHipLimit})`]);
+    if (c.waistToHeight) rows.push(['Waist-to-height ratio', c.waistToHeight.toFixed(2), `${c.waistToHeightRisk} (cut-off 0.5)`]);
+    if (c.leanMassKg) {
+      const lean = metric ? `${fmt(c.leanMassKg)} kg` : `${fmt(c.leanMassKg / 0.45359237)} lb`;
+      rows.push(['Lean body mass', lean, `From ${fmt(state.profile.bodyFatPct)}% body fat`]);
+      rows.push(['BMR (Katch-McArdle)', `${fmt(c.katchBmr)} kcal`, 'Lean-mass estimate, for comparison']);
+    }
+    return `
+      <div class="table-wrap">
+        <table class="data-table">
+          <caption>Body composition</caption>
+          <thead><tr><th scope="col">Measure</th><th scope="col">Value</th><th scope="col">Interpretation</th></tr></thead>
+          <tbody>${rows.map(([label, value, note]) => `<tr><th scope="row">${label}</th><td>${value}</td><td>${note}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+      ${rows.length === 1 ? '<p class="field__hint">Add body fat %, waist and hip measurements for more indicators.</p>' : ''}`;
   },
 
   renderTargets() {
@@ -894,6 +1100,7 @@ const ProfileUI = {
         <p class="stat"><span class="stat__value">${fmt(bmr)}</span><span class="stat__label">BMR (kcal)</span></p>
         <p class="stat"><span class="stat__value">${fmt(tdee)}</span><span class="stat__label">TDEE (kcal)</span></p>
       </div>
+      ${this.renderBodyComposition()}
       <div class="table-wrap">
         <table class="data-table">
           <caption>Your daily nutrition targets</caption>
@@ -991,13 +1198,7 @@ const RecommendationsUI = {
 
 const ScheduleUI = {
   init() {
-    $('#supplement-options').innerHTML = SUPPLEMENTS.map((s) => `
-      <div class="check">
-        <input type="checkbox" id="supp-${s.id}" name="supplements" value="${s.id}" ${state.supplements.selected.includes(s.id) ? 'checked' : ''}>
-        <label for="supp-${s.id}">${s.label}</label>
-      </div>`).join('');
-    $('#coffee-breakfast').checked = state.supplements.coffeeAtBreakfast;
-
+    this.syncForm();
     $('#supplement-form').addEventListener('change', () => {
       state.supplements = {
         selected: [...document.querySelectorAll('input[name="supplements"]:checked')].map((i) => i.value),
@@ -1007,6 +1208,16 @@ const ScheduleUI = {
       this.render(mealsForDay(state.viewDay));
       GroceryUI.render();
     });
+  },
+
+  /** Reflects the active user's supplement choices in the form. */
+  syncForm() {
+    $('#supplement-options').innerHTML = SUPPLEMENTS.map((s) => `
+      <div class="check">
+        <input type="checkbox" id="supp-${s.id}" name="supplements" value="${s.id}" ${state.supplements.selected.includes(s.id) ? 'checked' : ''}>
+        <label for="supp-${s.id}">${s.label}</label>
+      </div>`).join('');
+    $('#coffee-breakfast').checked = state.supplements.coffeeAtBreakfast;
   },
 
   render(meals) {
@@ -1319,7 +1530,7 @@ const PlannerUI = {
 const GroceryUI = {
   init() {
     const household = $('#household-size');
-    household.value = state.grocery.household;
+    this.syncForm();
     household.addEventListener('change', () => {
       const value = Math.min(12, Math.max(1, Math.round(Number(household.value) || 1)));
       household.value = value;
@@ -1352,6 +1563,11 @@ const GroceryUI = {
     $('#shopping-day').textContent = now.getDay() === 0
       ? 'Today is Sunday: your list is ready to shop.'
       : `Next shopping day: ${sunday.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.`;
+  },
+
+  /** Reflects the active user's household size in the form. */
+  syncForm() {
+    $('#household-size').value = state.grocery.household;
   },
 
   render() {
@@ -1387,6 +1603,126 @@ const GroceryUI = {
   },
 };
 
+/* ---------- Account ---------- */
+
+const AccountUI = {
+  email: null,
+
+  /** Restores a saved session before other controllers read state. */
+  init() {
+    const restored = AccountManager.restoreSession();
+    if (restored) {
+      this.email = restored;
+      Storage.scope = restored;
+      Object.assign(state, loadUserData());
+    }
+    this.renderState();
+
+    $('#account-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.submit();
+    });
+    $('#btn-logout').addEventListener('click', () => this.signOut());
+    $('#btn-delete-account').addEventListener('click', () => this.deleteAccount());
+
+    const toggle = $('#toggle-password');
+    toggle.addEventListener('click', () => {
+      const show = toggle.getAttribute('aria-pressed') !== 'true';
+      $('#user-password').type = show ? 'text' : 'password';
+      toggle.setAttribute('aria-pressed', String(show));
+    });
+  },
+
+  setError(id, message) {
+    $(`#${id}`).setAttribute('aria-invalid', String(Boolean(message)));
+    $(`#${id}-error`).textContent = message;
+  },
+
+  validate() {
+    const email = $('#user-email');
+    const password = $('#user-password');
+    const emailOk = email.value.trim() !== '' && email.validity.valid;
+    const passwordOk = password.value.length >= 8;
+    this.setError('user-email', emailOk ? '' : 'Enter an email address like you@example.com.');
+    this.setError('user-password', passwordOk ? '' : 'Use at least 8 characters.');
+    if (!emailOk) return email;
+    return passwordOk ? null : password;
+  },
+
+  async submit() {
+    const invalid = this.validate();
+    if (invalid) {
+      invalid.focus();
+      announce('Please fix the highlighted account fields.');
+      return;
+    }
+    const button = $('#btn-create-account');
+    const password = $('#user-password');
+    button.disabled = true;
+    button.textContent = 'Checking…';
+    try {
+      const { email, created } = await AccountManager.signInOrCreate($('#user-email').value, password.value);
+      if (created) {
+        Storage.scope = email;
+        saveUserData(); // the new account starts with the guest's current plan
+      }
+      Storage.save(Storage.KEYS.session, email);
+      $('#account-form').reset();
+      this.activate(email);
+      announce(created
+        ? `Account created for ${email}. Your current profile and meal plan were copied into it.`
+        : `Signed in as ${email}. Your saved profile and meal plan are loaded.`);
+    } catch (error) {
+      if (error.message === 'wrong-password') {
+        this.setError('user-password', 'That password does not match this email. Try again.');
+        password.select();
+        password.focus();
+      } else {
+        this.setError('user-email', 'Accounts need a secure (https) connection and a modern browser.');
+      }
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Create account / Sign in';
+      password.type = 'password';
+      $('#toggle-password').setAttribute('aria-pressed', 'false');
+    }
+  },
+
+  activate(email) {
+    this.email = email;
+    Storage.scope = email;
+    App.reloadUserData();
+    this.renderState();
+    $('#account-status').focus();
+  },
+
+  signOut(message) {
+    Storage.remove(Storage.KEYS.session);
+    const previous = this.email;
+    this.email = null;
+    Storage.scope = null;
+    App.reloadUserData();
+    this.renderState();
+    $('#user-email').focus();
+    announce(message ?? `Signed out of ${previous}. You are now browsing as a guest.`);
+  },
+
+  deleteAccount() {
+    const { email } = this;
+    if (!window.confirm(`Permanently delete the account ${email} and all of its saved data on this device?`)) return;
+    AccountManager.deleteAccount(email);
+    this.signOut(`Account ${email} and its data were deleted.`);
+  },
+
+  renderState() {
+    const signedIn = Boolean(this.email);
+    $('#logged-out-view').hidden = signedIn;
+    $('#logged-in-view').hidden = !signedIn;
+    $('#display-user-email').textContent = this.email ?? '';
+    $('#account-chip-label').textContent = signedIn ? this.email : 'Sign in';
+  },
+};
+
 /* ---------- Theme ---------- */
 
 const ThemeUI = {
@@ -1414,6 +1750,7 @@ const ThemeUI = {
 const App = {
   init() {
     ThemeUI.init();
+    AccountUI.init();
     ProfileUI.init();
     DashboardUI.init();
     ScheduleUI.init();
@@ -1421,6 +1758,16 @@ const App = {
     PlannerUI.init();
     GroceryUI.init();
     $('#year').textContent = String(new Date().getFullYear());
+    this.renderRecipesChanged();
+  },
+
+  /** Swaps in the active scope's data (after sign-in / sign-out) and refreshes every view. */
+  reloadUserData() {
+    Object.assign(state, loadUserData(), { editingId: null });
+    RecipeUI.resetForm();
+    ProfileUI.fill(state.profile);
+    ScheduleUI.syncForm();
+    GroceryUI.syncForm();
     this.renderRecipesChanged();
   },
 

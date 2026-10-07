@@ -60,7 +60,9 @@
           "Ingredient parser with embedded nutrition dictionary",
           "Rule-based food recommendations with reasons",
           "Meal timeline and supplement timing optimizer",
-          "Weekly grocery list grouped by store aisle"
+          "Weekly grocery list grouped by store aisle",
+          "Optional body composition: BMI, waist-to-hip and waist-to-height ratios, lean body mass",
+          "Private on-device accounts with separate profiles and meal plans"
         ]
       },
       {
@@ -136,10 +138,16 @@
         <svg class="brand__mark" aria-hidden="true" focusable="false"><use href="#sprig"/></svg>
         <span class="brand__name">Ube <em>Café</em></span>
       </a>
+      <div class="header-actions">
+      <a class="btn btn--ghost account-chip" href="#account">
+        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span id="account-chip-label">Sign in</span>
+      </a>
       <button type="button" id="theme-toggle" class="btn btn--ghost theme-toggle" aria-pressed="false">
         <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="20" height="20"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
         <span>Dark mode</span>
       </button>
+      </div>
     </div>
     <nav class="site-nav" aria-label="Primary">
       <ul>
@@ -174,6 +182,45 @@
       <noscript><p class="notice">This planner needs JavaScript to calculate targets and save your plan.</p></noscript>
     </section>
 
+    <!-- 0. Account -->
+    <section id="account" class="section" aria-labelledby="account-heading">
+      <header class="section__header">
+        <h2 id="account-heading" class="section__title">Your café <em>account</em></h2>
+        <p class="section__intro">Create an account to keep your own profile, recipes and meal plan, even when others use this browser. Accounts live only on this device; nothing is sent to a server.</p>
+      </header>
+
+      <div class="card account-card">
+        <div id="logged-out-view">
+          <form id="account-form" class="form" novalidate aria-describedby="account-hint">
+            <div class="field">
+              <label for="user-email">Email address</label>
+              <input type="email" id="user-email" name="email" required autocomplete="email" spellcheck="false" placeholder="you@example.com" aria-describedby="user-email-error">
+              <p id="user-email-error" class="field-error"></p>
+            </div>
+            <div class="field">
+              <label for="user-password">Password <span class="field__hint">(at least 8 characters)</span></label>
+              <div class="password-field">
+                <input type="password" id="user-password" name="password" required minlength="8" autocomplete="current-password" aria-describedby="user-password-error">
+                <button type="button" id="toggle-password" class="btn btn--ghost" aria-pressed="false" aria-controls="user-password">Show<span class="sr-only"> password</span></button>
+              </div>
+              <p id="user-password-error" class="field-error"></p>
+            </div>
+            <p id="account-hint" class="field__hint">New email? We'll create an account and copy in your current plan. Existing email? We'll sign you in. Passwords are salted and hashed; they are never stored as plain text.</p>
+            <button type="submit" class="btn btn--primary btn--block" id="btn-create-account">Create account / Sign in</button>
+          </form>
+        </div>
+
+        <div id="logged-in-view" hidden>
+          <p id="account-status" class="account-status" tabindex="-1">Signed in as <strong id="display-user-email"></strong></p>
+          <p class="field__hint">Your profile, measurements, recipes, meal plan and grocery checks are saved to this account on this device.</p>
+          <div class="button-row">
+            <button type="button" class="btn btn--secondary" id="btn-logout">Sign out</button>
+            <button type="button" class="btn btn--ghost btn--danger" id="btn-delete-account">Delete account</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- 1. Profile & targets -->
     <section id="profile" class="section" aria-labelledby="profile-title">
       <header class="section__header">
@@ -183,7 +230,7 @@
 
       <div class="split">
         <form id="profile-form" class="card form" novalidate aria-describedby="profile-required">
-          <p id="profile-required" class="form__note">All fields are required.</p>
+          <p id="profile-required" class="form__note">All fields are required except those marked optional.</p>
 
           <fieldset class="field-group">
             <legend>Measurement units</legend>
@@ -202,13 +249,13 @@
               <p id="age-error" class="field-error"></p>
             </div>
             <div class="field">
-              <label for="gender">Gender</label>
+              <label for="gender">Biological sex</label>
               <select id="gender" name="gender" aria-describedby="gender-hint">
                 <option value="female">Female</option>
                 <option value="male">Male</option>
                 <option value="other">Prefer not to say</option>
               </select>
-              <p id="gender-hint" class="field__hint">“Prefer not to say” averages the male and female equations.</p>
+              <p id="gender-hint" class="field__hint">Used by the calorie and RDA equations. “Prefer not to say” averages the male and female values.</p>
             </div>
           </div>
 
@@ -244,6 +291,28 @@
             <p id="weight-kg-error" class="field-error"></p>
           </div>
 
+          <fieldset class="field-group measurements">
+            <legend>Advanced body measurements <span class="field__hint">(optional)</span></legend>
+            <p id="measurements-hint" class="field__hint">Adds BMI context, waist-to-hip and waist-to-height ratios, and lean body mass.</p>
+            <div class="form__grid form__grid--three">
+              <div class="field">
+                <label for="body-fat">Body fat <span class="field__hint">(%)</span></label>
+                <input type="number" id="body-fat" name="body-fat" min="3" max="60" step="0.1" inputmode="decimal" placeholder="e.g. 18.5" aria-describedby="measurements-hint body-fat-error">
+                <p id="body-fat-error" class="field-error"></p>
+              </div>
+              <div class="field">
+                <label for="waist">Waist <span class="field__hint" data-length-unit>(in)</span></label>
+                <input type="number" id="waist" name="waist" data-length inputmode="decimal" aria-describedby="measurements-hint waist-error">
+                <p id="waist-error" class="field-error"></p>
+              </div>
+              <div class="field">
+                <label for="hip">Hip <span class="field__hint" data-length-unit>(in)</span></label>
+                <input type="number" id="hip" name="hip" data-length inputmode="decimal" aria-describedby="measurements-hint hip-error">
+                <p id="hip-error" class="field-error"></p>
+              </div>
+            </div>
+          </fieldset>
+
           <div class="field">
             <label for="activity">Activity level</label>
             <select id="activity" name="activity">
@@ -267,7 +336,8 @@
             </div>
           </fieldset>
 
-          <button type="submit" class="btn btn--primary btn--block">Calculate my targets</button>
+          <button type="submit" class="btn btn--primary btn--block">Save profile &amp; recalculate</button>
+          <p id="profile-saved" class="form__note"></p>
         </form>
 
         <div id="targets-output" class="card targets" aria-live="polite"></div>

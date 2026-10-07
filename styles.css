@@ -262,6 +262,20 @@ textarea {
   padding: var(--space-3) var(--gutter);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.account-chip span {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -585,6 +599,29 @@ textarea {
   gap: var(--space-4);
 }
 
+.measurements {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.measurements legend {
+  margin-bottom: 0;
+  padding-inline: var(--space-2);
+}
+
+.password-field {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.password-field input {
+  flex: 1;
+  min-width: 0;
+}
+
 .field {
   display: grid;
   align-content: start;
@@ -726,6 +763,24 @@ textarea {
 }
 
 /* ---------- Targets ---------- */
+.account-card {
+  max-width: 32rem;
+}
+
+.account-status {
+  font-size: var(--step-1);
+  overflow-wrap: anywhere;
+}
+
+.account-status:focus {
+  outline: none;
+}
+
+#logged-in-view {
+  display: grid;
+  gap: var(--space-4);
+}
+
 .targets {
   display: grid;
   gap: var(--space-5);
@@ -1225,6 +1280,10 @@ textarea {
     grid-template-columns: 3fr 1fr;
   }
 
+  .form__grid--three {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
   .card-grid,
   .planner-grid,
   .grocery-grid {
@@ -1270,13 +1329,14 @@ textarea {
     padding: var(--space-2) 0;
   }
 
-  .theme-toggle {
+  .header-actions {
     order: 2;
   }
 }
 
 @media (max-width: 30em) {
-  .theme-toggle span {
+  .theme-toggle span,
+  .account-chip span {
     position: absolute;
     width: 1px;
     height: 1px;
