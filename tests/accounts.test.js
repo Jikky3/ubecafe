@@ -10,8 +10,10 @@ const PRODUCTION_ITERATIONS = AccountManager.ITERATIONS;
 AccountManager.ITERATIONS = 1000;
 after(() => { AccountManager.ITERATIONS = PRODUCTION_ITERATIONS; });
 
-beforeEach(() => {
-  installLocalStorage();
+let store;
+beforeEach(async () => {
+  store = installLocalStorage();
+  await Storage.init({ indexedDB: null, localStorage: store }); // fresh cache per test
   Storage.scope = null;
 });
 
