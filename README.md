@@ -22,7 +22,8 @@ See [ROADMAP.md](ROADMAP.md) for where the project is headed.
 - **Targets**: BMR and TDEE (Mifflin-St Jeor × activity factor), goal- and
   timeline-adjusted calories with safety floors (1,200 kcal, or 1,500 kcal for
   men), protein, fat, carbohydrate (a 30 g keto split when chosen), sugar and
-  fiber, plus age- and sex-specific RDAs and a projected weight change.
+  fiber, daily limits for saturated fat (under 10 % of energy) and sodium
+  (2,300 mg), plus age- and sex-specific RDAs and a projected weight change.
 - **Allergies and diets**: peanuts, tree nuts, dairy, gluten, soy, eggs and
   shellfish, plus vegetarian, vegan, pescatarian, keto and paleo patterns.
   Each conflicting ingredient is swapped for a nutritionally similar, safe
@@ -30,7 +31,11 @@ See [ROADMAP.md](ROADMAP.md) for where the project is headed.
   the plan, dashboard and grocery list.
 - **Recipes**: paste a recipe or scan a photo (read on your device with
   Tesseract.js; the photo is never uploaded). Ingredient lines are parsed into
-  quantities, units and foods and totaled per serving, with swaps applied.
+  quantities, units and foods (177 built-in foods, with cooked, dry and canned
+  variants) and totaled per serving, with swaps applied. Any line the table
+  doesn't recognize is highlighted: pick a food for it, mark it as "no
+  nutrition", or add your own custom food (values per 100 g from a label).
+  Totals say "at least" until every line is resolved.
 - **Cook-along recipe view**: opens from the planner, the day's timeline, the
   library and the suggestion cards, with tick-off ingredients and steps,
   per-serving nutrition, inline swaps and the supplements that go with that
@@ -163,11 +168,16 @@ tools/
 
 ## Data sources
 
-- **Nutrient values** in `js/data/foods.js` were transcribed by hand from
-  [USDA FoodData Central](https://fdc.nal.usda.gov/) (SR Legacy) and are given
-  per 100 g. They have not been checked line by line and are not yet linked to
-  FoodData Central IDs, so **verify them before relying on them**. Phase 1 of
-  the roadmap replaces this table with a script-generated, sourced dataset.
+- **Nutrient values** in `js/data/foods.js` are per 100 g and were transcribed
+  by hand from [USDA FoodData Central](https://fdc.nal.usda.gov/) (SR Legacy);
+  each row names the USDA food description it comes from, and the few foods
+  not in SR Legacy (fortified oat milk, coconut aminos, coconut yogurt,
+  gluten-free bread and pasta, nutritional yeast) are marked as label-derived
+  estimates. The rows are
+  not yet linked to FoodData Central IDs or checked against the API, so
+  **verify them before relying on them**. Custom foods are whatever you enter.
+- **Limits**: saturated fat under 10 % of energy and sodium under 2,300 mg a
+  day (Dietary Guidelines for Americans 2020-2025, AHA).
 - **Energy**: Mifflin-St Jeor equation (1990); Katch-McArdle when body fat is
   known.
 - **Micronutrient targets**: NIH Office of Dietary Supplements, Dietary

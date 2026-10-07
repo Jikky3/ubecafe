@@ -391,7 +391,7 @@
 
         <section class="wizard-step" data-step="4" aria-labelledby="step-4-title" hidden>
           <h2 id="step-4-title" tabindex="-1">Add your first recipe</h2>
-          <p class="section__intro section__intro--left">Paste a recipe or scan a photo. It is checked against your allergies and diet right away. You can also skip this and use the sample library.</p>
+          <p class="section__intro section__intro--left">Paste a recipe or scan a photo. Ingredients are matched against <span data-food-count>177</span> built-in foods and checked against your allergies and diet right away. You can also skip this and use the sample library.</p>
           <div id="onboarding-importer" class="importer"></div>
           <div id="onboarding-added" class="onboarding-added" aria-live="polite"></div>
         </section>
@@ -451,6 +451,9 @@
             <span class="badge badge--ok"><span aria-hidden="true">✓</span> Met</span> 80% or more ·
             <span class="badge badge--warn"><span aria-hidden="true">!</span> Low</span> 50–79% ·
             <span class="badge badge--danger"><span aria-hidden="true">✕</span> Deficient</span> under 50% of the RDA.
+            Daily limits (saturated fat, sugar, sodium) show
+            <span class="badge badge--ok"><span aria-hidden="true">✓</span> Within limit</span> or
+            <span class="badge badge--danger"><span aria-hidden="true">✕</span> Over limit</span>.
           </p>
         </section>
 
@@ -478,7 +481,7 @@
           <svg class="botanical botanical--edge-right" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
           <header class="section__header">
             <h2 id="importer-title" class="section__title">Bring your <em>recipes home</em></h2>
-            <p class="section__intro">Paste a recipe or scan a photo. Ingredients are matched against a built-in nutrition dictionary and screened for your allergies and diet.</p>
+            <p class="section__intro">Paste a recipe or scan a photo. Ingredients are matched against a built-in nutrition dictionary of <span data-food-count>177</span> foods (values from USDA SR Legacy) and screened for your allergies and diet. Pick a food or add your own for anything it doesn't recognize.</p>
           </header>
           <div id="library-importer" class="importer"></div>
         </section>

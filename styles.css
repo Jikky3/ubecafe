@@ -1427,6 +1427,66 @@ textarea {
   font-weight: 500;
 }
 
+.analysis__table td {
+  vertical-align: top;
+}
+
+.analysis__table tr.is-unmatched > * {
+  background: var(--warn-bg);
+}
+
+.match-select {
+  margin-top: var(--space-1);
+  min-width: 12rem;
+}
+
+.match-note {
+  color: var(--ink-muted);
+  font-size: var(--step--1);
+}
+
+.match-change summary,
+.custom-food > summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 500;
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+}
+
+.match-change summary {
+  font-size: var(--step--1);
+  min-height: 2rem;
+}
+
+.custom-food__fields {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-2) 0 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+
+.custom-food__fields legend {
+  font-weight: 500;
+  padding-inline: var(--space-2);
+}
+
+.custom-food__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--space-3);
+}
+
+.recipe-card__warn {
+  color: var(--warn-ink);
+  font-size: var(--step--1);
+  font-weight: 500;
+}
+
 .recipe-card {
   display: grid;
   gap: var(--space-3);

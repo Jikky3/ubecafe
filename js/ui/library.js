@@ -48,7 +48,7 @@ export const RecipeLibrary = {
       return;
     }
     list.innerHTML = state.recipes.map((recipe) => {
-      const { perServing: p, flagged, isSafe } = analyzeForUser(recipe);
+      const { perServing: p, flagged, isSafe, unmatched } = analyzeForUser(recipe);
       const title = escapeHTML(recipe.title);
       const checks = flagged.map((f) => {
         const badge = SubstitutionEngine.badge(f.hits, { isAllergy: f.isAllergy, blocked: !f.substitute });
@@ -66,6 +66,7 @@ export const RecipeLibrary = {
               <div><dt>Carbs</dt><dd>${fmt(p.carbs)} g</dd></div>
               <div><dt>Fat</dt><dd>${fmt(p.fat)} g</dd></div>
             </dl>
+            ${unmatched ? `<p class="recipe-card__warn"><span aria-hidden="true">!</span> ${unmatched} ingredient${unmatched === 1 ? '' : 's'} not recognized, so totals are too low. Edit the recipe to choose a food.</p>` : ''}
             ${checks ? `<ul class="allergy-list" aria-label="Allergy and diet check for ${title}">${checks}</ul>` : ''}
             <div class="button-row">
               <button type="button" class="btn btn--secondary" data-view-recipe="${escapeHTML(recipe.id)}" aria-label="View ${title}">View</button>
