@@ -1,17 +1,20 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { RecommendationEngine } from '../js/engines/recommendations.js';
-import { BiometricsEngine } from '../js/engines/biometrics.js';
+import { NutritionEngine } from '../js/engines/nutrition.js';
+import { SubstitutionEngine } from '../js/engines/substitution.js';
 import { DEFAULT_PROFILE } from '../js/data/seeds.js';
 import { NUTRIENT_KEYS } from '../js/data/nutrients.js';
 
-const { targets } = BiometricsEngine.calculate(DEFAULT_PROFILE);
+// The seed profile leaves measurements empty until onboarding; use a filled-in adult.
+const PROFILE = { ...DEFAULT_PROFILE, age: 32, sex: 'female', heightCm: 167.64, weightKg: 68.04 };
+const { targets } = NutritionEngine.calculate(PROFILE);
 
 /** Intake that meets every target exactly, with optional ratio overrides (fraction of target). */
 const intakeAt = (ratios = {}) => Object.fromEntries(
   NUTRIENT_KEYS.map((key) => [key, targets[key] * (ratios[key] ?? 1)]),
 );
-const recommend = (ratios, mealsPlanned = 4) => RecommendationEngine.recommend(intakeAt(ratios), targets, mealsPlanned);
+const recommend = (ratios, mealsPlanned = 4, restrictions = []) => RecommendationEngine.recommend(intakeAt(ratios), targets, mealsPlanned, restrictions);
 const triggered = (recs, label) => recs.find((r) => r.trigger.startsWith(label));
 
 describe('RecommendationEngine.recommend', () => {
@@ -80,5 +83,58 @@ describe('RecommendationEngine.recommend', () => {
   it('treats a zero target as met', () => {
     const recs = RecommendationEngine.recommend(intakeAt({ omega3: 0 }), { ...targets, omega3: 0 }, 4);
     assert.equal(recs[0].trigger, 'All targets met');
+  });
+});
+
+describe('RecommendationEngine with restrictions', () => {
+  const restrictionsFor = (diet, allergies = []) => SubstitutionEngine.restrictionsFor({ diet, allergies });
+
+  it('adds no restriction note without restrictions', () => {
+    const [rec] = recommend({ calories: 0.7 });
+    assert.equal(rec.food, 'Oats with Nut Butter / Avocado');
+    assert.equal(rec.restrictionNote, '');
+  });
+
+  it('leaves out foods that clash and says which', () => {
+    const [rec] = recommend({ calories: 0.7 }, 4, ['peanuts']);
+    assert.equal(rec.food, 'Avocado');
+    assert.equal(rec.restrictionNote, 'Adjusted for your diet and allergies: left out Oats with Nut Butter.');
+  });
+
+  it('lists every removed food in the note', () => {
+    const [rec] = recommend({ vitaminB12: 0.5 }, 4, ['eggs', 'fish']);
+    assert.equal(rec.food, 'Greek Yogurt');
+    assert.match(rec.restrictionNote, /left out Eggs, Salmon\.$/);
+  });
+
+  it('switches to the alternative foods when every option clashes', () => {
+    const [rec] = recommend({ protein: 0.5 }, 4, ['dairy']);
+    assert.equal(rec.food, 'Hemp Seeds / Canned Tuna');
+    assert.match(rec.restrictionNote, /Greek Yogurt, Cottage Cheese/);
+    const [vegan] = recommend({ protein: 0.5 }, 4, restrictionsFor('vegan'));
+    assert.equal(vegan.food, 'Hemp Seeds', 'the alternative is filtered too');
+  });
+
+  it('keeps vegan vitamin B12 and D advice plant-based', () => {
+    const vegan = restrictionsFor('vegan');
+    assert.equal(triggered(recommend({ vitaminB12: 0.5 }, 4, vegan), 'Vitamin B12').food, 'Nutritional Yeast / Fortified Soy Milk');
+    assert.equal(triggered(recommend({ vitaminD: 0.5 }, 4, vegan), 'Vitamin D').food, 'Fortified Oat Milk / UV-Exposed Mushrooms');
+    assert.equal(triggered(recommend({ vitaminD: 0.5 }, 4, [...vegan, 'grains']), 'Vitamin D').food, 'UV-Exposed Mushrooms');
+  });
+
+  it('never recommends a restricted food for any rule', () => {
+    const allLow = Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, 0.3]));
+    const restricted = restrictionsFor('keto', ['dairy', 'tree_nuts', 'soy', 'eggs']);
+    const recs = recommend(allLow, 4, restricted);
+    assert.ok(recs.length > 0);
+    recs.forEach((rec) => rec.food.split(' / ').forEach((name) => {
+      const tags = RecommendationEngine.FOOD_RESTRICTIONS[name] ?? [];
+      assert.ok(!tags.some((t) => restricted.includes(t)), `${name} clashes with ${tags}`);
+    }));
+  });
+
+  it('safeFoods splits a food list into safe and removed names', () => {
+    assert.deepEqual(RecommendationEngine.safeFoods('Salmon / Chia Seeds / Walnuts', ['fish', 'tree_nuts']), { safe: ['Chia Seeds'], removed: ['Salmon', 'Walnuts'] });
+    assert.deepEqual(RecommendationEngine.safeFoods('Kiwi', []), { safe: ['Kiwi'], removed: [] });
   });
 });

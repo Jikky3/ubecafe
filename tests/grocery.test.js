@@ -1,10 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { GroceryAggregator } from '../js/engines/grocery.js';
-import { RecipeParser } from '../js/engines/recipe-parser.js';
+import { RecipeManager } from '../js/engines/recipe-manager.js';
+import { SubstitutionEngine } from '../js/engines/substitution.js';
+import { FOOD_DB } from '../js/data/foods.js';
 import { AISLES, PANTRY, SPICES } from '../js/data/nutrients.js';
 
-// Expected quantities are derived from RecipeParser itself, so these tests check the
+// Expected quantities are derived from RecipeManager itself, so these tests check the
 // roll-up (scaling, merging, grouping) and not the food table, which changes often.
 const RECIPE = {
   id: 'r-test',
@@ -15,20 +17,21 @@ const RECIPE = {
 const recipes = new Map([[RECIPE.id, RECIPE]]);
 const plan = (days) => Object.fromEntries(days.map((d) => [d, { lunch: RECIPE.id }]));
 const allItems = (groups) => groups.flatMap((g) => g.items);
-const matched = () => RecipeParser.analyze(RECIPE).ingredients.filter((ing) => ing.foodId);
+const analyze = (recipe) => ({ ...RecipeManager.analyze(recipe), isSafe: true });
+const matched = () => RecipeManager.analyze(RECIPE).ingredients.filter((ing) => ing.foodId);
 
 describe('GroceryAggregator.aggregate', () => {
   it('returns no groups for an empty plan and no supplements', () => {
-    assert.deepEqual(GroceryAggregator.aggregate({}, recipes, 1, []), []);
+    assert.deepEqual(GroceryAggregator.aggregate({}, recipes, 1, [], analyze), []);
   });
 
   it('ignores slots pointing at deleted recipes', () => {
-    assert.deepEqual(GroceryAggregator.aggregate({ monday: { lunch: 'missing' } }, recipes, 1, []), []);
+    assert.deepEqual(GroceryAggregator.aggregate({ monday: { lunch: 'missing' } }, recipes, 1, [], analyze), []);
   });
 
   it('merges the same food across days and scales by household / servings', () => {
     assert.ok(matched().length > 0, 'the fixture recipe should match at least one food');
-    const items = allItems(GroceryAggregator.aggregate(plan(['monday', 'wednesday']), recipes, 1, []));
+    const items = allItems(GroceryAggregator.aggregate(plan(['monday', 'wednesday']), recipes, 1, [], analyze));
     matched().forEach((ing) => {
       const item = items.find((i) => i.key === ing.foodId);
       assert.ok(item, `${ing.foodId} is listed`);
@@ -38,8 +41,8 @@ describe('GroceryAggregator.aggregate', () => {
   });
 
   it('scales linearly with household size', () => {
-    const one = allItems(GroceryAggregator.aggregate(plan(['monday']), recipes, 1, []));
-    const four = allItems(GroceryAggregator.aggregate(plan(['monday']), recipes, 4, []));
+    const one = allItems(GroceryAggregator.aggregate(plan(['monday']), recipes, 1, [], analyze));
+    const four = allItems(GroceryAggregator.aggregate(plan(['monday']), recipes, 4, [], analyze));
     one.filter((i) => i.grams !== undefined).forEach((item) => {
       const scaled = four.find((i) => i.key === item.key);
       assert.ok(Math.abs(scaled.grams - item.grams * 4) < 1e-9, item.key);
@@ -47,7 +50,7 @@ describe('GroceryAggregator.aggregate', () => {
   });
 
   it('keeps unmatched ingredients as quantity + unit in the pantry aisle', () => {
-    const items = allItems(GroceryAggregator.aggregate(plan(['monday', 'tuesday']), recipes, 2, []));
+    const items = allItems(GroceryAggregator.aggregate(plan(['monday', 'tuesday']), recipes, 2, [], analyze));
     const paste = items.find((i) => i.name === 'xyzzy paste');
     assert.ok(paste);
     assert.equal(paste.aisle, PANTRY);
@@ -56,7 +59,7 @@ describe('GroceryAggregator.aggregate', () => {
   });
 
   it('adds selected supplements as "check supply" items', () => {
-    const groups = GroceryAggregator.aggregate({}, recipes, 1, ['iron', 'vitaminD3']);
+    const groups = GroceryAggregator.aggregate({}, recipes, 1, ['iron', 'vitaminD3'], analyze);
     assert.equal(groups.length, 1);
     assert.equal(groups[0].aisle, SPICES);
     assert.deepEqual(groups[0].items.map((i) => [i.key, i.name, i.amount]), [
@@ -66,7 +69,7 @@ describe('GroceryAggregator.aggregate', () => {
   });
 
   it('groups by aisle in AISLES order and sorts items by name', () => {
-    const groups = GroceryAggregator.aggregate(plan(['monday']), recipes, 1, ['zinc', 'calcium']);
+    const groups = GroceryAggregator.aggregate(plan(['monday']), recipes, 1, ['zinc', 'calcium'], analyze);
     const order = groups.map((g) => AISLES.indexOf(g.aisle));
     assert.deepEqual(order, [...order].sort((a, b) => a - b));
     groups.forEach((g) => {
@@ -74,6 +77,65 @@ describe('GroceryAggregator.aggregate', () => {
       assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b)));
       g.items.forEach((i) => assert.equal(typeof i.amount, 'string'));
     });
+  });
+});
+
+describe('GroceryAggregator.aggregate with restrictions', () => {
+  const profile = (overrides) => ({ diet: 'omnivore', allergies: [], ...overrides });
+  const screened = (p) => (recipe) => SubstitutionEngine.screen(recipe, p);
+  const MILKY = { id: 'r-milk', title: 'Milky oats', servings: 1, ingredientsText: '1 cup milk\n50 g butter\n100 g spinach' };
+  const SWEET = { id: 'r-sweet', title: 'Sweet', servings: 1, ingredientsText: '2 tbsp maple syrup\n100 g spinach' };
+  const library = new Map([[MILKY.id, MILKY], [SWEET.id, SWEET]]);
+
+  it('calls the analyzer for each planned slot', () => {
+    const seen = [];
+    GroceryAggregator.aggregate({ monday: { lunch: MILKY.id, dinner: SWEET.id } }, library, 1, [], (recipe) => {
+      seen.push(recipe.id);
+      return analyze(recipe);
+    });
+    assert.deepEqual(seen.sort(), [MILKY.id, SWEET.id]);
+  });
+
+  it('buys substitutes instead of the originals and records what they replace', () => {
+    const items = allItems(GroceryAggregator.aggregate({ monday: { lunch: MILKY.id } }, library, 1, [], screened(profile({ allergies: ['dairy'] }))));
+    const keys = items.map((i) => i.key);
+    assert.ok(!keys.includes('milk') && !keys.includes('butter'), 'dairy is not bought');
+    const soy = items.find((i) => i.key === 'soy-milk');
+    const oil = items.find((i) => i.key === 'olive-oil');
+    assert.ok(soy && oil);
+    assert.deepEqual([...soy.replaces], ['milk']);
+    assert.deepEqual([...oil.replaces], ['butter']);
+    assert.ok(Math.abs(oil.grams - 50 * 0.75) < 1e-9, 'gramRatio scales the bought amount');
+    assert.equal(items.find((i) => i.key === 'spinach').replaces.size, 0);
+  });
+
+  it('merges a substitute with the same food bought directly', () => {
+    const both = { ...MILKY, id: 'r-both', ingredientsText: '1 cup milk\n1 cup soy milk' };
+    const items = allItems(GroceryAggregator.aggregate({ monday: { lunch: both.id } }, new Map([[both.id, both]]), 1, [], screened(profile({ allergies: ['dairy'] }))));
+    const soy = items.filter((i) => i.key === 'soy-milk');
+    assert.equal(soy.length, 1);
+    assert.ok(Math.abs(soy[0].grams - (244 + 243)) < 1e-9, `${soy[0].grams} g`);
+    assert.deepEqual([...soy[0].replaces], ['milk']);
+  });
+
+  it('leaves omitted ingredients off the list', () => {
+    const items = allItems(GroceryAggregator.aggregate({ monday: { lunch: SWEET.id } }, library, 1, [], screened(profile({ diet: 'keto' }))));
+    assert.deepEqual(items.map((i) => i.key), ['spinach']);
+  });
+
+  it('skips recipes that are unsafe for the profile', () => {
+    // Dairy + soy + tree nut allergies on keto (no grains): no milk substitute is safe.
+    const strict = profile({ diet: 'keto', allergies: ['dairy', 'soy', 'tree_nuts'] });
+    assert.equal(SubstitutionEngine.screen(MILKY, strict).isSafe, false);
+    const groups = GroceryAggregator.aggregate({ monday: { lunch: MILKY.id, dinner: SWEET.id } }, library, 1, ['iron'], screened(strict));
+    const keys = allItems(groups).map((i) => i.key);
+    assert.deepEqual(keys.sort(), ['s:iron', 'spinach'], 'only the safe recipe and the supplement remain');
+    assert.ok(Math.abs(allItems(groups).find((i) => i.key === 'spinach').grams - 100) < 1e-9);
+  });
+
+  it('formats substitutes with their own food data', () => {
+    const items = allItems(GroceryAggregator.aggregate({ monday: { lunch: MILKY.id } }, library, 1, [], screened(profile({ allergies: ['dairy'] }))));
+    assert.equal(items.find((i) => i.key === 'soy-milk').name, FOOD_DB['soy-milk'].name);
   });
 });
 

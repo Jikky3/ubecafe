@@ -21,7 +21,7 @@ const unversionedPlan = { monday: { breakfast: 'seed-oats', lunch: 5 }, funday: 
 describe('migrations', () => {
   test('current schema version is the last step', () => {
     assert.equal(CURRENT_SCHEMA_VERSION, MIGRATIONS[MIGRATIONS.length - 1].version);
-    assert.equal(CURRENT_SCHEMA_VERSION, 1);
+    assert.equal(CURRENT_SCHEMA_VERSION, 2);
   });
 
   test('v1 normalizes unversioned data to the shapes the UI expects', () => {
@@ -33,7 +33,7 @@ describe('migrations', () => {
       grocery: { household: 40, checked: ['eggs', null] },
       customFoods: [{ id: 'cf-1', name: 'Tempeh' }],
     };
-    const { data, version, applied } = runMigrations(input, 0);
+    const { data, version, applied } = runMigrations(input, 0, MIGRATIONS.slice(0, 1));
     assert.equal(version, 1);
     assert.deepEqual(applied, [1]);
     assert.deepEqual(data.recipes, [{ id: 'a', title: 'A', servings: 2, ingredientsText: '1 egg', instructions: '' }]);
@@ -72,8 +72,8 @@ describe('migrations', () => {
   });
 
   test('example: a future step can reshape the plan to several items per slot', () => {
-    const v2 = {
-      version: 2,
+    const future = {
+      version: CURRENT_SCHEMA_VERSION + 1,
       migrate: (d) => (d.plan ? {
         ...d,
         plan: Object.fromEntries(Object.entries(d.plan).map(([day, slots]) => [day, Object.fromEntries(
@@ -81,9 +81,37 @@ describe('migrations', () => {
         )])),
       } : d),
     };
-    const { data } = runMigrations({ plan: unversionedPlan }, 0, [...MIGRATIONS, v2]);
+    const { data } = runMigrations({ plan: unversionedPlan }, 0, [...MIGRATIONS, future]);
     assert.deepEqual(data.plan.monday.breakfast, [{ recipeId: 'seed-oats', portion: 1 }]);
     assert.deepEqual(data.plan.sunday.dinner, []);
+  });
+
+  test('v2 renames the profile `gender` field to `sex`', () => {
+    const input = { profile: { age: 40, gender: 'female', weightKg: 60 }, recipes: [] };
+    const { data, version, applied } = runMigrations(input, 1);
+    assert.equal(version, 2);
+    assert.deepEqual(applied, [2]);
+    assert.deepEqual(data.profile, { age: 40, weightKg: 60, sex: 'female' });
+    assert.ok(!('gender' in data.profile));
+    assert.deepEqual(data.recipes, [], 'other keys pass through');
+    assert.equal(input.profile.gender, 'female', 'input is not mutated');
+  });
+
+  test('v2 keeps an existing `sex` and drops the stale `gender`', () => {
+    const { data } = runMigrations({ profile: { sex: 'male', gender: 'female' } }, 1);
+    assert.deepEqual(data.profile, { sex: 'male' });
+  });
+
+  test('v2 is a no-op without a profile or without `gender`', () => {
+    assert.deepEqual(runMigrations({ plan: {} }, 1).data, { plan: {} });
+    assert.deepEqual(runMigrations({ profile: { sex: 'other', age: 30 } }, 1).data, { profile: { sex: 'other', age: 30 } });
+    assert.deepEqual(runMigrations({}, 1).data, {});
+  });
+
+  test('unversioned profiles run v1 then v2', () => {
+    const { data, applied } = runMigrations({ profile: { gender: 'male' } }, 0);
+    assert.deepEqual(applied, [1, 2]);
+    assert.deepEqual(data.profile, { sex: 'male' });
   });
 
   test('rejects newer, invalid and malformed inputs', () => {
@@ -111,8 +139,8 @@ describe('Storage', () => {
     assert.equal(await Storage.init({ indexedDB: null, localStorage: ls }), 'localStorage');
 
     assert.deepEqual(Storage.scopes().sort(), [null, 'a.b@x.org'].sort());
-    assert.equal(ls.getItem('ubecafe.schemaVersion'), '1');
-    assert.equal(ls.getItem('ubecafe.user:a.b@x.org.schemaVersion'), '1');
+    assert.equal(ls.getItem('ubecafe.schemaVersion'), String(CURRENT_SCHEMA_VERSION));
+    assert.equal(ls.getItem('ubecafe.user:a.b@x.org.schemaVersion'), String(CURRENT_SCHEMA_VERSION));
     assert.equal(Storage.load(Storage.KEYS.plan, null).monday.lunch, '');
     assert.equal(Storage.load(Storage.KEYS.theme, null), 'dark');
     assert.equal(ls.getItem('other.app'), 'untouched');
@@ -121,6 +149,18 @@ describe('Storage', () => {
     Storage.scope = 'a.b@x.org';
     assert.deepEqual(Storage.load(Storage.KEYS.recipes, []), [{ id: 'r1', title: 'Soup', servings: 1, ingredientsText: '', instructions: '' }]);
     assert.equal(Storage.load(Storage.KEYS.theme, null), 'dark', 'global keys ignore the scope');
+  });
+
+  test('init migrates a stored v1 profile from `gender` to `sex`', async () => {
+    const ls = createLocalStorage({
+      'ubecafe.schemaVersion': '1',
+      'ubecafe.profile': JSON.stringify({ age: 33, gender: 'female' }),
+    });
+    await Storage.init({ indexedDB: null, localStorage: ls });
+    assert.deepEqual(Storage.load(Storage.KEYS.profile, null), { age: 33, sex: 'female' });
+    await Storage.flush();
+    assert.equal(ls.getItem('ubecafe.schemaVersion'), String(CURRENT_SCHEMA_VERSION));
+    assert.deepEqual(JSON.parse(ls.getItem('ubecafe.profile')), { age: 33, sex: 'female' });
   });
 
   test('saves write through to the backend and stamp the schema version', async () => {
@@ -164,7 +204,7 @@ describe('Storage', () => {
     const written = new Map();
     const backend = {
       name: 'fake',
-      async readAll() { return new Map([['ubecafe.schemaVersion', '1'], ['ubecafe.plan', '{"monday":{}}']]); },
+      async readAll() { return new Map([['ubecafe.schemaVersion', String(CURRENT_SCHEMA_VERSION)], ['ubecafe.plan', '{"monday":{}}']]); },
       write: (key, value) => new Promise((resolve) => setTimeout(() => { written.set(key, value); resolve(); }, 5)),
     };
     assert.equal(await Storage.init({ backend, indexedDB: null, localStorage: null }), 'fake');
