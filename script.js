@@ -7,6 +7,7 @@
  *  2. Utilities & Storage – formatting, escaping, localStorage persistence
  *  3. BiometricsEngine    – Mifflin-St Jeor energy + macro/micro targets
  *  4. RecipeParser        – raw text + ingredient parsing, nutrition analysis
+ *     AllergenGuard       – allergen detection + rule-based safe substitutions
  *  5. RecommendationEngine– if/else "which food & why" rules
  *  6. ScheduleOptimizer   – meal timeline + supplement timing rules
  *  7. GroceryAggregator   – weekly ingredient roll-up grouped by aisle
@@ -81,8 +82,12 @@ const FOOD_ROWS = [
   ['eggs', 'Eggs', DAIRY, ['egg'], 50, 243, [143, 12.6, 0.7, 9.5, 0.4, 0, 160, 0, 2, 0.9, 56, 1.8, 138, 12, 1.3, 0.07], 'eggs'],
   ['greek-yogurt', 'Greek yogurt', DAIRY, ['greek yogurt', 'yogurt', 'yoghurt'], 170, 245, [59, 10, 3.6, 0.4, 3.2, 0, 1, 0, 0, 0.75, 110, 0.1, 141, 11, 0.5, 0]],
   ['cottage-cheese', 'Cottage cheese', DAIRY, ['cottage cheese'], 113, 226, [81, 10.5, 4.8, 2.3, 4, 0, 28, 0, 0, 0.5, 111, 0.2, 125, 9, 0.5, 0.01]],
-  ['milk', 'Milk', DAIRY, ['milk', 'fortified milk', 'almond milk', 'oat milk', 'soy milk'], 244, 244, [50, 3.3, 4.8, 2, 5, 0, 55, 0, 1.2, 0.5, 120, 0, 150, 11, 0.4, 0]],
+  ['milk', 'Milk', DAIRY, ['milk', 'fortified milk', 'whole milk', 'skim milk'], 244, 244, [50, 3.3, 4.8, 2, 5, 0, 55, 0, 1.2, 0.5, 120, 0, 150, 11, 0.4, 0]],
   ['cheddar', 'Cheddar cheese', DAIRY, ['cheese', 'cheddar', 'cheddar cheese', 'feta', 'feta cheese'], 28, 113, [403, 25, 1.3, 33, 0.5, 0, 265, 0, 0.6, 0.8, 721, 0.7, 98, 28, 3.1, 0.1]],
+  ['oat-milk', 'Fortified oat milk', DAIRY, ['oat milk', 'oatmilk'], 240, 240, [48, 1, 6.7, 2, 2.9, 0.8, 0, 0, 1.1, 0.38, 120, 0.3, 160, 5, 0.1, 0.1]],
+  ['almond-milk', 'Almond milk', DAIRY, ['almond milk'], 240, 240, [15, 0.6, 0.6, 1.1, 0, 0.2, 63, 0, 1, 0, 184, 0.3, 67, 7, 0.1, 0]],
+  ['soy-milk', 'Fortified soy milk', DAIRY, ['soy milk', 'soymilk'], 243, 243, [43, 3.6, 1.7, 2.4, 1, 0.5, 63, 0, 1.1, 1.1, 123, 0.4, 148, 16, 0.3, 0.2]],
+  ['coconut-yogurt', 'Coconut yogurt', DAIRY, ['coconut yogurt', 'dairy free yogurt'], 150, 245, [120, 0.5, 6, 10.5, 2, 0.5, 0, 0, 0, 0, 120, 0.2, 40, 5, 0.1, 0]],
   ['butter', 'Butter', DAIRY, ['butter'], 14, 227, [717, 0.9, 0.1, 81, 0.1, 0, 684, 0, 0, 0.2, 24, 0, 24, 2, 0.1, 0.3]],
   ['oats', 'Rolled oats', PANTRY, ['oats', 'rolled oats', 'oatmeal'], 40, 81, [379, 13, 68, 6.5, 1, 10, 0, 0, 0, 0, 52, 4.3, 362, 138, 3.6, 0.1]],
   ['brown-rice', 'Brown rice', PANTRY, ['rice', 'brown rice'], 45, 185, [367, 7.5, 76, 3.2, 0.9, 3.6, 0, 0, 0, 0, 9, 1.5, 250, 143, 2, 0.03]],
@@ -98,9 +103,19 @@ const FOOD_ROWS = [
   ['walnuts', 'Walnuts', PANTRY, ['walnut', 'walnuts'], 28, 117, [654, 15.2, 13.7, 65.2, 2.6, 6.7, 1, 1.3, 0, 0, 98, 2.9, 441, 158, 3.1, 9.1]],
   ['chia', 'Chia seeds', PANTRY, ['chia', 'chia seeds'], 12, 192, [486, 16.5, 42, 30.7, 0, 34.4, 0, 1.6, 0, 0, 631, 7.7, 407, 335, 4.6, 17.8]],
   ['pumpkin-seeds', 'Pumpkin seeds', PANTRY, ['pumpkin seeds', 'pepitas'], 28, 129, [559, 30, 10.7, 49, 1.4, 6, 1, 1.9, 0, 0, 46, 8.8, 809, 592, 7.8, 0.12]],
-  ['peanut-butter', 'Peanut butter', PANTRY, ['peanut butter', 'nut butter', 'almond butter'], 32, 256, [588, 25, 20, 50, 9.2, 6, 0, 0, 0, 0, 43, 1.9, 649, 154, 2.5, 0.03]],
+  ['peanut-butter', 'Peanut butter', PANTRY, ['peanut butter'], 32, 256, [588, 25, 20, 50, 9.2, 6, 0, 0, 0, 0, 43, 1.9, 649, 154, 2.5, 0.03]],
   ['honey', 'Honey', PANTRY, ['honey', 'maple syrup'], 21, 339, [304, 0.3, 82, 0, 82, 0.2, 0, 0.5, 0, 0, 6, 0.4, 52, 2, 0.2, 0]],
-  ['soy-sauce', 'Soy sauce', PANTRY, ['soy sauce', 'tamari'], 16, 255, [53, 8, 4.9, 0.6, 0.4, 0.8, 0, 0, 0, 0, 33, 1.5, 435, 74, 0.4, 0]],
+  ['almond-butter', 'Almond butter', PANTRY, ['almond butter', 'cashew butter', 'nut butter'], 32, 256, [614, 21, 19, 56, 4.4, 10, 0, 0, 0, 0, 264, 3.5, 748, 279, 3.3, 0.4]],
+  // Allergy-safe substitutes (see ALLERGY_SUBSTITUTES)
+  ['sunflower-butter', 'Sunflower seed butter', PANTRY, ['sunflower seed butter', 'sunflower butter', 'sunbutter'], 32, 256, [617, 17.3, 23.3, 55.2, 3, 5.7, 0, 0.2, 0, 0, 64, 4.1, 576, 311, 5.3, 0.07]],
+  ['sunflower-seeds', 'Sunflower seeds', PANTRY, ['sunflower seed', 'sunflower seeds'], 28, 140, [584, 20.8, 20, 51.5, 2.6, 8.6, 3, 1.4, 0, 0, 78, 5.3, 645, 325, 5, 0.07]],
+  ['hemp-seeds', 'Hemp seeds', PANTRY, ['hemp seed', 'hemp seeds', 'hemp hearts'], 30, 160, [553, 31.6, 8.7, 48.8, 1.5, 4, 1, 0.5, 0, 0, 70, 8, 1200, 700, 9.9, 8.7]],
+  ['nutritional-yeast', 'Nutritional yeast', PANTRY, ['nutritional yeast'], 5, 80, [400, 50, 33, 5, 0, 20, 0, 0, 0, 50, 40, 4, 2000, 160, 20, 0]],
+  ['gf-oats', 'Certified gluten-free oats', PANTRY, ['gluten free oats', 'certified gluten free oats'], 40, 81, [379, 13, 68, 6.5, 1, 10, 0, 0, 0, 0, 52, 4.3, 362, 138, 3.6, 0.1]],
+  ['gf-pasta', 'Gluten-free brown rice pasta', PANTRY, ['gluten free pasta', 'rice pasta', 'brown rice pasta'], 56, 100, [360, 7.5, 76, 2.7, 0.5, 3.4, 0, 0, 0, 0, 10, 1, 200, 90, 1.5, 0]],
+  ['gf-bread', 'Gluten-free bread', PANTRY, ['gluten free bread'], 30, 45, [250, 4, 45, 6, 4, 4, 0, 0, 0, 0, 80, 2, 150, 30, 0.6, 0.1]],
+  ['coconut-aminos', 'Coconut aminos', PANTRY, ['coconut aminos'], 15, 240, [33, 0, 7, 0, 7, 0, 0, 0, 0, 0, 0, 0, 180, 0, 0, 0]],
+  ['soy-sauce', 'Soy sauce', PANTRY, ['soy sauce', 'shoyu'], 16, 255, [53, 8, 4.9, 0.6, 0.4, 0.8, 0, 0, 0, 0, 33, 1.5, 435, 74, 0.4, 0]],
   ['salt', 'Sea salt', SPICES, ['salt', 'sea salt'], 1, 288, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0.3, 8, 1, 0.1, 0]],
   ['black-pepper', 'Black pepper', SPICES, ['pepper', 'black pepper'], 1, 110, [251, 10, 64, 3.3, 0.6, 25, 27, 0, 0, 0, 443, 9.7, 1329, 171, 1.2, 0.15]],
   ['cumin', 'Ground cumin', SPICES, ['cumin'], 2, 96, [375, 17.8, 44, 22, 2.3, 10.5, 64, 7.7, 0, 0, 931, 66, 1788, 366, 4.8, 0.2]],
@@ -123,6 +138,96 @@ const FOOD_DB = Object.fromEntries(
     },
   ]),
 );
+
+/* ---------- Allergens ---------- */
+
+const ALLERGENS = [
+  { id: 'peanuts', label: 'Peanuts', option: 'Peanut allergy' },
+  { id: 'tree_nuts', label: 'Tree nuts', option: 'Tree nut allergy' },
+  { id: 'dairy', label: 'Dairy', option: 'Lactose / dairy' },
+  { id: 'gluten', label: 'Gluten', option: 'Gluten sensitivity' },
+  { id: 'soy', label: 'Soy', option: 'Soy free' },
+  { id: 'eggs', label: 'Eggs', option: 'Egg free' },
+];
+const ALLERGEN_BY_ID = Object.fromEntries(ALLERGENS.map((a) => [a.id, a]));
+
+/** Allergens contained in dictionary foods (oats are flagged for gluten cross-contact). */
+const FOOD_ALLERGENS = {
+  'peanut-butter': ['peanuts'],
+  'almond-butter': ['tree_nuts'],
+  almonds: ['tree_nuts'],
+  walnuts: ['tree_nuts'],
+  'almond-milk': ['tree_nuts'],
+  milk: ['dairy'],
+  'greek-yogurt': ['dairy'],
+  'cottage-cheese': ['dairy'],
+  cheddar: ['dairy'],
+  butter: ['dairy'],
+  oats: ['gluten'],
+  bread: ['gluten'],
+  pasta: ['gluten'],
+  'soy-sauce': ['soy', 'gluten'],
+  tofu: ['soy'],
+  'soy-milk': ['soy'],
+  eggs: ['eggs'],
+};
+Object.entries(FOOD_ALLERGENS).forEach(([id, allergens]) => { FOOD_DB[id].allergens = allergens; });
+Object.values(FOOD_DB).forEach((food) => { food.allergens ??= []; });
+
+/** Fallback keywords for ingredients the dictionary does not recognize. */
+const ALLERGEN_KEYWORDS = {
+  peanuts: ['peanut', 'groundnut'],
+  tree_nuts: ['cashew', 'pecan', 'pistachio', 'hazelnut', 'macadamia', 'pine nut', 'brazil nut', 'praline', 'marzipan', 'nutella'],
+  dairy: ['cream', 'ghee', 'whey', 'casein', 'parmesan', 'mozzarella', 'ricotta', 'buttermilk', 'kefir', 'custard'],
+  gluten: ['wheat', 'flour', 'barley', 'rye', 'couscous', 'semolina', 'bulgur', 'farro', 'spelt', 'seitan', 'breadcrumb', 'panko', 'cracker'],
+  soy: ['soy', 'edamame', 'tempeh', 'miso'],
+  eggs: ['egg', 'mayonnaise', 'mayo', 'meringue', 'aioli'],
+};
+const ALLERGEN_KEYWORD_PATTERNS = Object.fromEntries(Object.entries(ALLERGEN_KEYWORDS)
+  .map(([id, words]) => [id, new RegExp(`\\b(?:${words.join('|')})(?:e?s)?\\b`)]));
+
+/**
+ * Safe, nutritionally similar substitutes per allergen. `foodId` links to the
+ * dictionary so swaps keep accurate nutrition and reach the grocery list.
+ * `replaces` limits an option to specific source foods; options without it are
+ * generic fallbacks. `gramRatio` scales the original weight.
+ */
+const ALLERGY_SUBSTITUTES = {
+  peanuts: [
+    { foodId: 'sunflower-butter', ratio: '1:1', gramRatio: 1, replaces: ['peanut-butter'], note: 'Provides healthy fats and a similar creamy texture.' },
+    { foodId: 'pumpkin-seeds', ratio: '1:1', gramRatio: 1, note: 'Matches the crunch and adds magnesium and zinc.' },
+  ],
+  tree_nuts: [
+    { foodId: 'sunflower-butter', ratio: '1:1', gramRatio: 1, replaces: ['almond-butter'], note: 'Seed butter with the same spreadable texture and healthy fats.' },
+    { foodId: 'oat-milk', ratio: '1:1', gramRatio: 1, replaces: ['almond-milk'], note: 'Fortified oat milk keeps calcium and vitamin D without nuts.' },
+    { foodId: 'sunflower-seeds', ratio: '1:1', gramRatio: 1, note: 'Great substitute for walnuts or pine nuts in pestos and salads.' },
+    { foodId: 'hemp-seeds', ratio: '1:1', gramRatio: 1, note: 'Rich in healthy fats, omega-3 and complete protein.' },
+    { foodId: 'chickpeas', ratio: '1:1', gramRatio: 1, note: 'Roasted chickpeas offer crunch and protein without nut allergens.' },
+  ],
+  dairy: [
+    { foodId: 'nutritional-yeast', ratio: '1 tbsp per 1/4 cup cheese', gramRatio: 0.18, replaces: ['cheddar'], note: 'Replaces cheesy, umami flavor in savory dishes and adds B12.' },
+    { foodId: 'olive-oil', ratio: '3/4 the amount', gramRatio: 0.75, replaces: ['butter'], note: 'Heart-healthy fat for cooking and roasting.' },
+    { foodId: 'coconut-yogurt', ratio: '1:1', gramRatio: 1, replaces: ['greek-yogurt', 'cottage-cheese'], note: 'Creamy, calcium-fortified yogurt; much lower in protein, so pair with seeds.' },
+    { foodId: 'oat-milk', ratio: '1:1', gramRatio: 1, note: 'Fortified oat milk replaces milk while maintaining calcium and vitamin D.' },
+    { foodId: 'soy-milk', ratio: '1:1', gramRatio: 1, note: 'Fortified soy milk is the closest match to dairy milk for protein.' },
+  ],
+  gluten: [
+    { foodId: 'gf-oats', ratio: '1:1', gramRatio: 1, replaces: ['oats'], note: 'Certified gluten-free oats avoid wheat cross-contact with identical nutrition.' },
+    { foodId: 'gf-bread', ratio: '1:1', gramRatio: 1, replaces: ['bread'], note: 'Gluten-free loaf for toast and sandwiches.' },
+    { foodId: 'gf-pasta', ratio: '1:1', gramRatio: 1, replaces: ['pasta'], note: 'Brown rice pasta keeps complex carbohydrates high.' },
+    { foodId: 'coconut-aminos', ratio: '1:1', gramRatio: 1, replaces: ['soy-sauce'], note: 'Wheat- and soy-free seasoning with a similar savory taste.' },
+    { foodId: 'quinoa', ratio: '1:1', gramRatio: 1, note: 'Naturally gluten-free grain that keeps complex carbs and adds protein.' },
+  ],
+  soy: [
+    { foodId: 'coconut-aminos', ratio: '1:1', gramRatio: 1, replaces: ['soy-sauce'], note: 'Soy-free seasoning with a similar savory taste.' },
+    { foodId: 'oat-milk', ratio: '1:1', gramRatio: 1, replaces: ['soy-milk'], note: 'Fortified oat milk keeps calcium and vitamin D.' },
+    { foodId: 'chickpeas', ratio: '1:1', gramRatio: 1, note: 'Plant protein that holds its shape like tofu in bowls and curries.' },
+  ],
+  eggs: [
+    { foodId: 'tofu', ratio: '1:1 by weight', gramRatio: 1, replaces: ['eggs'], note: 'Crumbled firm tofu makes a protein-rich, egg-free scramble.' },
+    { foodId: 'chia', ratio: '1 tbsp chia + 3 tbsp water per egg', gramRatio: 0.24, note: 'A “chia egg” binds baked goods and adds omega-3.' },
+  ],
+};
 
 /** Alias index sorted longest-first so "peanut butter" wins over "butter". */
 const ALIAS_INDEX = Object.values(FOOD_DB)
@@ -245,7 +350,7 @@ const OCR_SAMPLES = [
 
 const DEFAULT_PROFILE = {
   units: 'imperial', age: 32, gender: 'female', heightCm: 167.64, weightKg: 68.04,
-  activity: 'moderate', goal: 'maintain', bodyFatPct: null, waistCm: null, hipCm: null, updatedAt: null,
+  activity: 'moderate', goal: 'maintain', allergies: [], bodyFatPct: null, waistCm: null, hipCm: null, updatedAt: null,
 };
 const DEFAULT_SUPPLEMENTS = { selected: ['vitaminD3', 'iron', 'magnesium'], coffeeAtBreakfast: true };
 const DEFAULT_GROCERY = { household: 1, checked: [] };
@@ -573,11 +678,111 @@ class RecipeParser {
 }
 
 /* =========================================================
+ * 4b. AllergenGuard – detection and hard-exclusion substitution
+ * ======================================================= */
+
+class AllergenGuard {
+  static #cache = new WeakMap();
+
+  /** Allergens in one parsed ingredient: dictionary tags, else keyword scan. */
+  static detect(ingredient) {
+    if (ingredient.foodId) return FOOD_DB[ingredient.foodId].allergens;
+    const name = ` ${ingredient.name.toLowerCase().replace(/[^a-z\s]/g, ' ')} `;
+    return ALLERGENS.filter((a) => ALLERGEN_KEYWORD_PATTERNS[a.id].test(name)).map((a) => a.id);
+  }
+
+  /** A substitute that is itself free of every active allergen, preferring food-specific options. */
+  static pickSubstitute(allergen, foodId, allergies) {
+    const options = ALLERGY_SUBSTITUTES[allergen] ?? [];
+    const isSafe = (option) => !FOOD_DB[option.foodId].allergens.some((a) => allergies.includes(a));
+    return options.find((o) => o.replaces?.includes(foodId) && isSafe(o))
+      ?? options.find((o) => !o.replaces && isSafe(o))
+      ?? null;
+  }
+
+  /**
+   * Returns the recipe analysis with every allergen ingredient swapped for a safe
+   * substitute. `isSafe` is false when any allergen has no safe substitute; such
+   * recipes are excluded from the plan, dashboard and grocery list.
+   */
+  static filterRecipeForUser(recipe, allergies) {
+    const analysis = RecipeParser.analyze(recipe);
+    if (!allergies.length) return { ...analysis, isSafe: true, flagged: [] };
+
+    const key = [...allergies].sort().join('|');
+    const byAllergies = this.#cache.get(recipe) ?? new Map();
+    this.#cache.set(recipe, byAllergies);
+    if (byAllergies.has(key)) return byAllergies.get(key);
+
+    const flagged = [];
+    const ingredients = analysis.ingredients.map((ing) => {
+      const hits = this.detect(ing).filter((a) => allergies.includes(a));
+      if (!hits.length) return ing;
+      const original = ing.foodId ? FOOD_DB[ing.foodId].name : ing.name;
+      const sub = hits.map((a) => this.pickSubstitute(a, ing.foodId, allergies)).find(Boolean) ?? null;
+      flagged.push({
+        raw: ing.raw,
+        original,
+        allergens: hits,
+        substitute: sub && { name: FOOD_DB[sub.foodId].name, ratio: sub.ratio, note: sub.note },
+      });
+      if (!sub) return { ...ing, blocked: true, nutrients: emptyNutrients() };
+      const grams = ing.grams * sub.gramRatio;
+      return {
+        ...ing,
+        foodId: sub.foodId,
+        grams,
+        nutrients: scaleNutrients(FOOD_DB[sub.foodId].nutrients, grams / 100),
+        swappedFrom: original,
+      };
+    });
+
+    const totals = ingredients.reduce((sum, ing) => addNutrients(sum, ing.nutrients), emptyNutrients());
+    const result = {
+      ingredients,
+      totals,
+      perServing: scaleNutrients(totals, 1 / Math.max(1, Number(recipe.servings) || 1)),
+      unmatched: analysis.unmatched,
+      isSafe: flagged.every((f) => f.substitute),
+      flagged,
+    };
+    byAllergies.set(key, result);
+    return result;
+  }
+
+  /** Accessible allergen badge (icon + text, never color alone). */
+  static badge(allergens, level = 'warn') {
+    const labels = allergens.map((a) => ALLERGEN_BY_ID[a].label).join(', ');
+    return `<span class="badge badge--${level}"><span aria-hidden="true">${level === 'danger' ? '✕' : '!'}</span><span class="sr-only">Allergen warning:</span> ${labels}</span>`;
+  }
+}
+
+/* =========================================================
  * 5. RecommendationEngine – explicit if/else rules
  * ======================================================= */
 
 class RecommendationEngine {
-  static recommend(intake, targets, mealsPlanned) {
+  /** Allergens carried by foods named in recommendations. */
+  static FOOD_ALLERGENS = {
+    'Oats with Nut Butter': ['gluten', 'peanuts', 'tree_nuts'],
+    'Greek Yogurt': ['dairy'],
+    'Cottage Cheese': ['dairy'],
+    'Plain Yogurt': ['dairy'],
+    'Fortified Milk': ['dairy'],
+    Eggs: ['eggs'],
+    'Firm Tofu': ['soy'],
+    Almonds: ['tree_nuts'],
+    Walnuts: ['tree_nuts'],
+  };
+
+  /** Removes foods containing active allergens; returns the safe names and the ones left out. */
+  static safeFoods(foodList, allergies) {
+    const names = foodList.split(' / ');
+    const isSafe = (name) => !(this.FOOD_ALLERGENS[name] ?? []).some((a) => allergies.includes(a));
+    return { safe: names.filter(isSafe), removed: names.filter((n) => !isSafe(n)) };
+  }
+
+  static recommend(intake, targets, mealsPlanned, allergies = []) {
     if (mealsPlanned === 0) {
       return [{
         food: 'Plan your first meal',
@@ -589,11 +794,16 @@ class RecommendationEngine {
 
     const recs = [];
     const ratio = (key) => (targets[key] > 0 ? intake[key] / targets[key] : 1);
-    const add = (key, food, reason) => {
+    /** Adds a rule's output, swapping in `alternative` foods when every option conflicts with an allergy. */
+    const add = (key, foods, reason, alternative) => {
+      let { safe, removed } = this.safeFoods(foods, allergies);
+      if (!safe.length && alternative) safe = this.safeFoods(alternative, allergies).safe;
+      if (!safe.length) return;
       const r = ratio(key);
       recs.push({
-        food,
+        food: safe.join(' / '),
         reason,
+        allergyNote: removed.length ? `Adjusted for your allergies: left out ${removed.join(', ')}.` : '',
         trigger: `${NUTRIENT_BY_KEY[key].label} at ${Math.round(r * 100)}% of ${NUTRIENT_BY_KEY[key].isLimit ? 'your daily limit' : 'target'}`,
         priority: r < 0.5 || r > 1.25 ? 'high' : 'medium',
       });
@@ -608,7 +818,7 @@ class RecommendationEngine {
 
     // Protein, with carb context
     if (ratio('protein') < 0.8 && intake.carbs >= targets.carbs) {
-      add('protein', 'Greek Yogurt / Cottage Cheese', 'High-protein, low-carb boost to meet muscle protein synthesis targets.');
+      add('protein', 'Greek Yogurt / Cottage Cheese', 'High-protein, low-carb boost to meet muscle protein synthesis targets.', 'Hemp Seeds / Canned Tuna');
     } else if (ratio('protein') < 0.8) {
       add('protein', 'Chicken Breast / Eggs / Firm Tofu', 'Complete protein sources that close your protein deficit while leaving room for the carbohydrates you still need.');
     }
@@ -767,18 +977,25 @@ class ScheduleOptimizer {
  * ======================================================= */
 
 class GroceryAggregator {
-  static aggregate(plan, recipesById, household, supplementIds) {
+  /**
+   * @param {(recipe) => {isSafe: boolean, ingredients: Array}} analyze – allergy-aware analyzer;
+   *   unsafe recipes are skipped and substituted ingredients are bought instead of the originals.
+   */
+  static aggregate(plan, recipesById, household, supplementIds, analyze) {
     const items = new Map();
 
     DAYS.forEach((day) => MEAL_SLOTS.forEach((slot) => {
       const recipe = recipesById.get(plan[day]?.[slot.id]);
       if (!recipe) return;
+      const analysis = analyze(recipe);
+      if (!analysis.isSafe) return;
       const factor = household / Math.max(1, recipe.servings);
-      RecipeParser.analyze(recipe).ingredients.forEach((ing) => {
+      analysis.ingredients.forEach((ing) => {
         if (ing.foodId) {
           const food = FOOD_DB[ing.foodId];
-          const entry = items.get(food.id) ?? { key: food.id, name: food.name, aisle: food.aisle, grams: 0, food };
+          const entry = items.get(food.id) ?? { key: food.id, name: food.name, aisle: food.aisle, grams: 0, food, replaces: new Set() };
           entry.grams += ing.grams * factor;
+          if (ing.swappedFrom) entry.replaces.add(ing.swappedFrom.toLowerCase());
           items.set(food.id, entry);
         } else {
           const key = `x:${ing.name.toLowerCase().replace(/[^a-z]+/g, '-')}:${ing.unit ?? 'unit'}`;
@@ -922,11 +1139,25 @@ const recipesById = () => new Map(state.recipes.map((r) => [r.id, r]));
 const currentTargets = () => BiometricsEngine.calculate(state.profile);
 
 /** Returns each slot's planned recipe and per-serving nutrients for a day. */
+/** Recipe analysis with the active user's allergy substitutions applied. */
+const analyzeForUser = (recipe) => AllergenGuard.filterRecipeForUser(recipe, state.profile.allergies);
+
+/**
+ * Returns each slot's planned recipe and per-serving nutrients for a day.
+ * Recipes that cannot be made allergy-safe are marked `blocked` and contribute nothing.
+ */
 const mealsForDay = (day) => {
   const byId = recipesById();
   return Object.fromEntries(MEAL_SLOTS.map((slot) => {
     const recipe = byId.get(state.plan[day]?.[slot.id]);
-    return [slot.id, recipe ? { recipe, nutrients: RecipeParser.analyze(recipe).perServing } : null];
+    if (!recipe) return [slot.id, null];
+    const analysis = analyzeForUser(recipe);
+    return [slot.id, {
+      recipe,
+      blocked: !analysis.isSafe,
+      flagged: analysis.flagged,
+      nutrients: analysis.isSafe ? analysis.perServing : emptyNutrients(),
+    }];
   }));
 };
 
@@ -939,9 +1170,15 @@ const ProfileUI = {
 
   init() {
     this.form = $('#profile-form');
+    $('#allergy-options').innerHTML = ALLERGENS.map((a) => `
+      <div class="check">
+        <input type="checkbox" id="allergy-${a.id}" name="allergy" value="${a.id}">
+        <label for="allergy-${a.id}">${a.option}</label>
+      </div>`).join('');
     this.fill(state.profile);
     this.form.addEventListener('change', (e) => {
       if (e.target.name === 'units') this.switchUnits(e.target.value);
+      if (e.target.name === 'allergy') this.applyAllergies();
     });
     this.form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -964,6 +1201,7 @@ const ProfileUI = {
     f['height-in'].value = Math.round((totalInches % 12) * 10) / 10;
     f['weight-lb'].value = Math.round((profile.weightKg / 0.45359237) * 10) / 10;
     f['body-fat'].value = profile.bodyFatPct ?? '';
+    this.form.querySelectorAll('input[name="allergy"]').forEach((box) => { box.checked = profile.allergies.includes(box.value); });
     f.waist.value = toLength(profile.waistCm);
     f.hip.value = toLength(profile.hipCm);
     this.toggleUnitFields(profile.units);
@@ -1043,6 +1281,7 @@ const ProfileUI = {
         ? Number(f['height-cm'].value)
         : (Number(f['height-ft'].value) * 12 + Number(f['height-in'].value)) * 2.54,
       weightKg: units === 'metric' ? Number(f['weight-kg'].value) : Number(f['weight-lb'].value) * 0.45359237,
+      allergies: this.readAllergies(),
       bodyFatPct: optional(f['body-fat']),
       waistCm: optional(f.waist, lengthFactor),
       hipCm: optional(f.hip, lengthFactor),
@@ -1053,6 +1292,24 @@ const ProfileUI = {
     App.renderNutrition();
     const where = AccountUI.email ? ` to ${AccountUI.email}` : ' on this device';
     announce(`Profile saved${where}. Targets updated: ${fmt(currentTargets().targets.calories)} calories per day.`);
+  },
+
+  readAllergies() {
+    return [...this.form.querySelectorAll('input[name="allergy"]:checked')].map((box) => box.value);
+  },
+
+  /** Allergy toggles apply immediately: re-screens every recipe, the plan and the grocery list. */
+  applyAllergies() {
+    state.profile = { ...state.profile, allergies: this.readAllergies() };
+    Storage.save(Storage.KEYS.profile, state.profile);
+    App.renderRecipesChanged();
+    const results = state.recipes.map(analyzeForUser);
+    const swapped = results.filter((r) => r.isSafe && r.flagged.length).length;
+    const blocked = results.filter((r) => !r.isSafe).length;
+    const labels = state.profile.allergies.map((a) => ALLERGEN_BY_ID[a].label.toLowerCase());
+    announce(labels.length
+      ? `Allergies set: ${labels.join(', ')}. ${swapped} recipe${swapped === 1 ? '' : 's'} adjusted with safe swaps${blocked ? `, ${blocked} excluded` : ''}.`
+      : 'All allergy filters cleared.');
   },
 
   renderSavedNote(profile) {
@@ -1160,7 +1417,7 @@ const DashboardUI = {
 
   render() {
     const meals = mealsForDay(state.viewDay);
-    const planned = Object.values(meals).filter(Boolean);
+    const planned = Object.values(meals).filter((meal) => meal && !meal.blocked);
     const intake = planned.reduce((sum, m) => addNutrients(sum, m.nutrients), emptyNutrients());
     const { targets } = currentTargets();
     const lowCount = NUTRIENTS.filter((m) => m.group === 'micro' && intake[m.key] < targets[m.key] * 0.8).length;
@@ -1180,7 +1437,7 @@ const DashboardUI = {
 
 const RecommendationsUI = {
   render({ intake, targets, plannedCount }) {
-    const recs = RecommendationEngine.recommend(intake, targets, plannedCount);
+    const recs = RecommendationEngine.recommend(intake, targets, plannedCount, state.profile.allergies);
     const label = { high: 'High priority', medium: 'Suggested', info: 'Note' };
     $('#recommendation-list').innerHTML = recs.map((rec) => `
       <li>
@@ -1189,6 +1446,7 @@ const RecommendationsUI = {
           <h3 class="rec__food">${escapeHTML(rec.food)}</h3>
           <p class="rec__trigger"><strong>Why now:</strong> ${escapeHTML(rec.trigger)}</p>
           <p>${escapeHTML(rec.reason)}</p>
+          ${rec.allergyNote ? `<p class="rec__allergy">${escapeHTML(rec.allergyNote)}</p>` : ''}
         </article>
       </li>`).join('');
   },
@@ -1226,10 +1484,17 @@ const ScheduleUI = {
     $('#timeline').innerHTML = MEAL_SLOTS.map((slot) => {
       const meal = meals[slot.id];
       const tips = ScheduleOptimizer.mealTips(slot.id, meal, coffeeAtBreakfast);
-      const mealText = meal
-        ? `<p class="timeline__meal">${escapeHTML(meal.recipe.title)}</p>
-           <p class="timeline__meta">${fmt(meal.nutrients.calories)} kcal · ${fmt(meal.nutrients.protein)} g protein · ${fmt(meal.nutrients.fat)} g fat · ${fmt(meal.nutrients.vitaminC)} mg vitamin C</p>`
-        : '<p class="timeline__meal timeline__meal--empty">No meal planned</p>';
+      let mealText = '<p class="timeline__meal timeline__meal--empty">No meal planned</p>';
+      if (meal?.blocked) {
+        const allergens = [...new Set(meal.flagged.filter((f) => !f.substitute).flatMap((f) => f.allergens))];
+        mealText = `<p class="timeline__meal">${escapeHTML(meal.recipe.title)}</p>
+           <p class="allergy-note">${AllergenGuard.badge(allergens, 'danger')} No safe substitute, so this meal is excluded. Choose another recipe.</p>`;
+      } else if (meal) {
+        const swaps = meal.flagged.map((f) => `${f.substitute.name} for ${f.original.toLowerCase()}`);
+        mealText = `<p class="timeline__meal">${escapeHTML(meal.recipe.title)}</p>
+           <p class="timeline__meta">${fmt(meal.nutrients.calories)} kcal · ${fmt(meal.nutrients.protein)} g protein · ${fmt(meal.nutrients.fat)} g fat · ${fmt(meal.nutrients.vitaminC)} mg vitamin C</p>
+           ${swaps.length ? `<p class="allergy-note">Allergy-safe swaps: ${escapeHTML(swaps.join('; '))}.</p>` : ''}`;
+      }
       const supps = schedule[slot.id].length
         ? `<ul class="supp-list">${schedule[slot.id].map((s) => `
             <li><strong>${SUPPLEMENT_BY_ID[s.id].label}</strong>: ${escapeHTML(s.reason)}</li>`).join('')}</ul>`
@@ -1366,23 +1631,36 @@ const RecipeUI = {
       return;
     }
     const temp = { ...recipe, servings: recipe.servings || 1 };
-    const { ingredients, perServing, unmatched } = RecipeParser.analyze(temp);
-    const rows = ingredients.map((ing) => `
+    const { ingredients: parsed } = RecipeParser.analyze(temp);
+    const { ingredients, perServing, unmatched, isSafe, flagged } = analyzeForUser(temp);
+    const active = state.profile.allergies;
+    const allergyCell = (ing, i) => {
+      const hits = AllergenGuard.detect(parsed[i]).filter((a) => active.includes(a));
+      if (!hits.length) return active.length ? 'Safe' : '—';
+      if (ing.blocked) return `${AllergenGuard.badge(hits, 'danger')} No safe substitute`;
+      const sub = flagged.find((f) => f.raw === ing.raw).substitute;
+      return `${AllergenGuard.badge(hits)} Swapped for <strong>${escapeHTML(sub.name)}</strong> (${escapeHTML(sub.ratio)}). ${escapeHTML(sub.note)}`;
+    };
+    const rows = ingredients.map((ing, i) => `
       <tr>
         <td>${escapeHTML(ing.raw)}</td>
         <td>${ing.foodId ? escapeHTML(FOOD_DB[ing.foodId].name) : '<span class="badge badge--warn"><span aria-hidden="true">!</span> Not recognized</span>'}</td>
         <td>${ing.foodId ? `${fmt(ing.grams)} g` : '—'}</td>
         <td>${fmt(ing.nutrients.calories)}</td>
+        <td>${allergyCell(ing, i)}</td>
       </tr>`).join('');
+    const blockedAllergens = [...new Set(flagged.filter((f) => !f.substitute).flatMap((f) => f.allergens))];
     out.innerHTML = `
       <p class="analysis__summary">Per serving: <strong>${fmt(perServing.calories)} kcal</strong> ·
         ${fmt(perServing.protein)} g protein · ${fmt(perServing.carbs)} g carbs · ${fmt(perServing.fat)} g fat ·
         ${fmt(perServing.fiber)} g fiber · ${fmt(perServing.iron)} mg iron</p>
+      ${!isSafe ? `<p class="analysis__danger">${AllergenGuard.badge(blockedAllergens, 'danger')} This recipe contains an allergen with no safe substitute. It will be excluded from your meal plan and grocery list.</p>` : ''}
+      ${isSafe && flagged.length ? `<p class="analysis__warn">Nutrition reflects ${flagged.length} allergy-safe swap${flagged.length === 1 ? '' : 's'} for your profile.</p>` : ''}
       ${unmatched ? `<p class="analysis__warn">${unmatched} ingredient${unmatched === 1 ? ' was' : 's were'} not found in the nutrition dictionary and ${unmatched === 1 ? 'is' : 'are'} excluded from totals.</p>` : ''}
       <div class="table-wrap">
         <table class="data-table">
           <caption>Ingredient matches for the whole recipe</caption>
-          <thead><tr><th scope="col">Ingredient</th><th scope="col">Matched food</th><th scope="col">Weight</th><th scope="col">kcal</th></tr></thead>
+          <thead><tr><th scope="col">Ingredient</th><th scope="col">Matched food</th><th scope="col">Weight</th><th scope="col">kcal</th><th scope="col">Allergy check</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
@@ -1464,8 +1742,14 @@ const RecipeUI = {
       return;
     }
     list.innerHTML = state.recipes.map((recipe) => {
-      const { perServing: p } = RecipeParser.analyze(recipe);
+      const { perServing: p, flagged, isSafe } = analyzeForUser(recipe);
       const title = escapeHTML(recipe.title);
+      const allergyList = flagged.length ? `
+            <ul class="allergy-list" aria-label="Allergy check for ${title}">
+              ${flagged.map((f) => (f.substitute
+                ? `<li>${AllergenGuard.badge(f.allergens)} ${escapeHTML(f.original)} → <strong>${escapeHTML(f.substitute.name)}</strong></li>`
+                : `<li>${AllergenGuard.badge(f.allergens, 'danger')} ${escapeHTML(f.original)}: no safe substitute; excluded from your plan</li>`)).join('')}
+            </ul>` : '';
       return `
         <li>
           <article class="card recipe-card">
@@ -1476,7 +1760,7 @@ const RecipeUI = {
               <div><dt>Protein</dt><dd>${fmt(p.protein)} g</dd></div>
               <div><dt>Carbs</dt><dd>${fmt(p.carbs)} g</dd></div>
               <div><dt>Fat</dt><dd>${fmt(p.fat)} g</dd></div>
-            </dl>
+            </dl>${isSafe && flagged.length ? '\n            <p class="recipe-card__meta">Nutrition shown with allergy-safe swaps.</p>' : ''}${allergyList}
             <div class="button-row">
               <button type="button" class="btn btn--ghost" data-action="edit" data-id="${recipe.id}" aria-label="Edit ${title}">Edit</button>
               <button type="button" class="btn btn--ghost btn--danger" data-action="delete" data-id="${recipe.id}" aria-label="Delete ${title}">Delete</button>
@@ -1511,8 +1795,20 @@ const PlannerUI = {
   },
 
   render() {
+    const labels = new Map(state.recipes.map((r) => {
+      const { isSafe, flagged } = analyzeForUser(r);
+      const allergens = [...new Set(flagged.filter((f) => !f.substitute).flatMap((f) => f.allergens))]
+        .map((a) => ALLERGEN_BY_ID[a].label.toLowerCase());
+      let suffix = '';
+      if (!isSafe) suffix = ` (contains ${allergens.join(', ')})`;
+      else if (flagged.length) suffix = ' (allergy-safe swaps)';
+      return [r.id, { text: `${r.title}${suffix}`, disabled: !isSafe }];
+    }));
     const options = (selected) => ['<option value="">— No meal —</option>',
-      ...state.recipes.map((r) => `<option value="${r.id}" ${r.id === selected ? 'selected' : ''}>${escapeHTML(r.title)}</option>`)].join('');
+      ...state.recipes.map((r) => {
+        const { text, disabled } = labels.get(r.id);
+        return `<option value="${r.id}" ${r.id === selected ? 'selected' : ''} ${disabled ? 'disabled' : ''}>${escapeHTML(text)}</option>`;
+      })].join('');
     $('#planner-grid').innerHTML = DAYS.map((day) => `
       <fieldset class="card day-card">
         <legend>${DAY_LABELS[day]}${day === todayKey() ? ' <span class="pill">Today</span>' : ''}</legend>
@@ -1571,7 +1867,7 @@ const GroceryUI = {
   },
 
   render() {
-    const groups = GroceryAggregator.aggregate(state.plan, recipesById(), state.grocery.household, state.supplements.selected);
+    const groups = GroceryAggregator.aggregate(state.plan, recipesById(), state.grocery.household, state.supplements.selected, analyzeForUser);
     const checked = new Set(state.grocery.checked);
     const list = $('#grocery-list');
     if (!groups.length) {
@@ -1588,7 +1884,7 @@ const GroceryUI = {
             return `
               <li class="check check--grocery">
                 <input type="checkbox" id="${id}" value="${escapeHTML(item.key)}" ${checked.has(item.key) ? 'checked' : ''}>
-                <label for="${id}"><span class="grocery__name">${escapeHTML(item.name)}</span> <span class="grocery__qty">${escapeHTML(item.amount)}</span></label>
+                <label for="${id}"><span class="grocery__name">${escapeHTML(item.name)}${item.replaces?.size ? ` <span class="grocery__swap">allergy-safe swap for ${escapeHTML([...item.replaces].join(', '))}</span>` : ''}</span> <span class="grocery__qty">${escapeHTML(item.amount)}</span></label>
               </li>`;
           }).join('')}
         </ul>

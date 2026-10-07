@@ -62,7 +62,8 @@
           "Meal timeline and supplement timing optimizer",
           "Weekly grocery list grouped by store aisle",
           "Optional body composition: BMI, waist-to-hip and waist-to-height ratios, lean body mass",
-          "Private on-device accounts with separate profiles and meal plans"
+          "Private on-device accounts with separate profiles and meal plans",
+          "Allergen screening for peanuts, tree nuts, dairy, gluten, soy and eggs with rule-based safe substitutions"
         ]
       },
       {
@@ -311,6 +312,12 @@
                 <p id="hip-error" class="field-error"></p>
               </div>
             </div>
+          </fieldset>
+
+          <fieldset class="field-group measurements" aria-describedby="allergy-hint">
+            <legend>Allergies &amp; dietary restrictions</legend>
+            <p id="allergy-hint" class="field__hint">Applied instantly. Recipes are scanned for these allergens; each one is swapped for a safe, nutritionally similar substitute, or the recipe is excluded from your plan and grocery list.</p>
+            <div id="allergy-options" class="check-grid"></div>
           </fieldset>
 
           <div class="field">
