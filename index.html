@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- [html-validate-disable-next long-title -- 69 characters as rendered; the rule counts "&amp;amp;" as five] -->
-  <title>Ube Café Nutrition Planner: Meal Plans, Macro Targets &amp; Grocery Lists</title>
-  <meta name="description" content="Free, private meal planner that calculates calorie and macro targets with the Mifflin-St Jeor formula, tracks 11 micronutrients, explains which foods to eat and why, times your supplements, and builds a Sunday grocery list.">
-  <meta name="keywords" content="meal planner, nutrition calculator, macro calculator, Mifflin-St Jeor, micronutrients, RDA, recipe nutrition analyzer, supplement timing, grocery list generator, weekly meal plan">
+  <title>Ube Café Nutrition Planner: Meal Plans, Macro Targets & Grocery Lists</title>
+  <meta name="description" content="Free, private meal planner: create an account, set goals, diet and allergies, and get Mifflin-St Jeor calorie and macro targets, 11 micronutrient RDAs, allergy-safe recipe swaps, food recommendations with reasons, supplement timing and a Sunday grocery list.">
+  <meta name="keywords" content="meal planner, nutrition calculator, macro calculator, Mifflin-St Jeor, micronutrients, RDA, recipe nutrition analyzer, supplement timing, grocery list generator, weekly meal plan, allergy substitutions, nut-free, vegan, keto, paleo, onboarding">
   <meta name="author" content="Ube Café">
   <meta name="robots" content="index, follow">
   <meta name="theme-color" content="#f4efe4" media="(prefers-color-scheme: light)">
@@ -28,8 +27,6 @@
   <meta name="twitter:description" content="Rule-based meal planning: macro targets, micronutrient dashboard, food recommendations with reasons, supplement timing and grocery lists.">
 
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 26C6 12 16 4 28 4c0 12-8 22-22 22z' fill='%234a5a32'/%3E%3Cpath d='M6 26 22 10' stroke='%23f4efe4' stroke-width='2'/%3E%3C/svg%3E">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap">
@@ -55,19 +52,16 @@
         "accessibilityHazard": "none",
         "accessMode": ["textual", "visual"],
         "featureList": [
-          "Mifflin-St Jeor calorie target calculator",
-          "Protein, carbohydrate, fat and sugar targets by goal",
+          "Private on-device accounts with a four-step onboarding wizard",
+          "Mifflin-St Jeor calorie targets adjusted for goal and timeline",
+          "Protein, carbohydrate, fat and sugar targets, including a keto split",
           "RDA targets for vitamin A, C, D, B12, calcium, iron, potassium, magnesium, zinc, fiber and omega-3",
-          "Daily macro and micronutrient progress dashboard with deficiency badges",
-          "Recipe text importer and on-device photo OCR (Tesseract.js)",
-          "Ingredient parser with embedded nutrition dictionary",
+          "Body composition: BMI, waist-to-hip and waist-to-height ratios, lean body mass",
+          "Allergen and diet screening (peanuts, tree nuts, dairy, gluten, soy, eggs, shellfish; vegetarian, vegan, pescatarian, keto, paleo) with nutritionally similar substitutions",
+          "Recipe text importer and simulated photo OCR with an embedded nutrition dictionary",
           "Rule-based food recommendations with reasons",
           "Meal timeline and supplement timing optimizer",
-          "Weekly grocery list grouped by store aisle",
-          "Optional body composition: BMI, waist-to-hip and waist-to-height ratios, lean body mass",
-          "Private on-device accounts with separate profiles and meal plans",
-          "Export and import of all data, with optional passphrase-encrypted backups",
-          "Installable offline web app"
+          "Weekly grocery list grouped by store aisle"
         ]
       },
       {
@@ -136,7 +130,6 @@
       <circle cx="32" cy="12" r="5" style="fill:var(--berry)"/>
     </symbol>
   </svg>
-
   <header class="site-header">
     <div class="site-header__inner">
       <a class="brand" href="#main">
@@ -144,254 +137,124 @@
         <span class="brand__name">Ube <em>Café</em></span>
       </a>
       <div class="header-actions">
-      <a class="btn btn--ghost account-chip" href="#account">
-        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <span id="account-chip-label">Sign in</span>
-      </a>
-      <button type="button" id="theme-toggle" class="btn btn--ghost theme-toggle" aria-pressed="false">
-        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="20" height="20"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-        <span>Dark mode</span>
-      </button>
+        <button type="button" id="profile-button" class="btn btn--ghost profile-button" aria-haspopup="dialog" aria-controls="profile-drawer" hidden>
+          <span id="profile-initials" class="avatar" aria-hidden="true"></span>
+          <span class="profile-button__text">
+            <span id="profile-button-name"></span>
+            <span id="profile-button-stats" class="profile-button__stats"></span>
+          </span>
+        </button>
+        <button type="button" id="theme-toggle" class="btn btn--ghost theme-toggle" aria-pressed="false">
+          <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="20" height="20"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <span class="theme-toggle__label">Dark mode</span>
+        </button>
       </div>
     </div>
-    <nav class="site-nav" aria-label="Primary">
-      <ul>
-        <li><a href="#profile">Profile</a></li>
-        <li><a href="#dashboard">Dashboard</a></li>
-        <li><a href="#recommendations">Food &amp; Why</a></li>
-        <li><a href="#planner">Meal Plan</a></li>
-        <li><a href="#schedule">Schedule</a></li>
-        <li><a href="#recipes">Recipes</a></li>
-        <li><a href="#grocery">Grocery List</a></li>
-        <li><a href="#backup">Backup</a></li>
-      </ul>
-    </nav>
   </header>
 
   <div id="app-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <main id="main" tabindex="-1">
-    <section class="hero" aria-labelledby="hero-title">
+    <!-- ===== View 1: Sign in / Create account ===== -->
+    <section id="auth-view" class="view auth" aria-labelledby="auth-title">
       <svg class="botanical botanical--hero-left" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
       <svg class="botanical botanical--hero-right" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
-      <p class="eyebrow">A slow-food planner · rule-based, private, free</p>
-      <h1 id="hero-title" class="display">
-        <span class="display__paren" aria-hidden="true">(</span>
-        Meals that <em>nourish you</em>
-        <span class="display__paren" aria-hidden="true">)</span>
-      </h1>
-      <p class="lede">Pull up a chair. Tell us a little about yourself and we'll brew your daily calorie, macro and micronutrient targets, explain which foods to reach for and why, time your supplements, and pour it all into a Sunday grocery list.</p>
-      <div class="button-row button-row--center">
-        <a class="btn btn--primary" href="#profile">Set my targets</a>
-        <a class="btn btn--secondary" href="#recipes">Import a recipe</a>
+
+      <div class="auth__intro">
+        <p class="eyebrow">A slow-food planner · rule-based, private, free</p>
+        <h1 id="auth-title" class="display" tabindex="-1">
+          <span class="display__paren" aria-hidden="true">(</span>
+          Meals that <em>nourish you</em>
+          <span class="display__paren" aria-hidden="true">)</span>
+        </h1>
+        <p class="lede">Pull up a chair. Ube Café brews your daily calorie, macro and micronutrient targets, explains which foods to reach for and why, swaps out allergens, times your supplements, and pours it all into a Sunday grocery list.</p>
+        <ul class="feature-list">
+          <li>Calorie targets from the Mifflin-St Jeor equation, plus protein, carbs, fat and a sugar limit</li>
+          <li>Daily allowances for vitamins A, C, D and B12, calcium, iron, potassium, magnesium, zinc, fiber and omega-3</li>
+          <li>Allergen and diet screening with nutritionally similar substitutes</li>
+          <li>Supplement timing and an aisle-sorted weekly grocery list</li>
+        </ul>
       </div>
-      <noscript><p class="notice">This planner needs JavaScript to calculate targets and save your plan.</p></noscript>
-    </section>
 
-    <!-- 0. Account -->
-    <section id="account" class="section" aria-labelledby="account-heading">
-      <header class="section__header">
-        <h2 id="account-heading" class="section__title">Your café <em>account</em></h2>
-        <p class="section__intro">Create an account to keep your own profile, recipes and meal plan, even when others use this browser. Accounts live only on this device; nothing is sent to a server.</p>
-      </header>
+      <div class="card auth__card">
+        <div id="auth-tablist" class="segmented tabs-segmented" role="tablist" aria-label="Account access">
+          <button type="button" role="tab" id="tab-signin" aria-controls="panel-signin" aria-selected="true">Sign in</button>
+          <button type="button" role="tab" id="tab-signup" aria-controls="panel-signup" aria-selected="false" tabindex="-1">Create account</button>
+        </div>
 
-      <div class="card account-card">
-        <div id="logged-out-view">
-          <form id="account-form" class="form" novalidate aria-describedby="account-hint">
+        <div id="panel-signin" role="tabpanel" aria-labelledby="tab-signin">
+          <form id="signin-form" class="form" novalidate>
+            <h2 class="form__title">Welcome back</h2>
+            <p id="signin-error" class="form-error" role="alert"></p>
             <div class="field">
-              <label for="user-email">Email address</label>
-              <input type="email" id="user-email" name="email" required autocomplete="email" spellcheck="false" placeholder="you@example.com" aria-describedby="user-email-error">
-              <p id="user-email-error" class="field-error"></p>
+              <label for="signin-email">Email address</label>
+              <input type="email" id="signin-email" autocomplete="email" spellcheck="false" required aria-describedby="signin-email-error">
+              <p id="signin-email-error" class="field-error"></p>
             </div>
             <div class="field">
-              <label for="user-password">Password <span class="field__hint">(at least 8 characters)</span></label>
+              <label for="signin-password">Password</label>
               <div class="password-field">
-                <input type="password" id="user-password" name="password" required minlength="8" autocomplete="current-password" aria-describedby="user-password-error">
-                <button type="button" id="toggle-password" class="btn btn--ghost" aria-pressed="false" aria-controls="user-password">Show<span class="sr-only"> password</span></button>
+                <input type="password" id="signin-password" autocomplete="current-password" required aria-describedby="signin-password-error">
+                <button type="button" class="btn btn--ghost" data-password-toggle aria-controls="signin-password" aria-pressed="false">Show<span class="sr-only"> password</span></button>
               </div>
-              <p id="user-password-error" class="field-error"></p>
+              <p id="signin-password-error" class="field-error"></p>
             </div>
-            <p id="account-hint" class="field__hint">New email? We'll create an account and copy in your current plan. Existing email? We'll sign you in. Passwords are salted and hashed; they are never stored as plain text.</p>
-            <button type="submit" class="btn btn--primary btn--block" id="btn-create-account">Create account / Sign in</button>
+            <button type="submit" class="btn btn--primary btn--block">Sign in</button>
           </form>
         </div>
 
-        <div id="logged-in-view" hidden>
-          <p id="account-status" class="account-status" tabindex="-1">Signed in as <strong id="display-user-email"></strong></p>
-          <p class="field__hint">Your profile, measurements, recipes, meal plan and grocery checks are saved to this account on this device.</p>
-          <div class="button-row">
-            <button type="button" class="btn btn--secondary" id="btn-logout">Sign out</button>
-            <button type="button" class="btn btn--ghost btn--danger" id="btn-delete-account">Delete account</button>
-          </div>
+        <div id="panel-signup" role="tabpanel" aria-labelledby="tab-signup" hidden>
+          <form id="signup-form" class="form" novalidate aria-describedby="signup-privacy">
+            <h2 class="form__title">Create your account</h2>
+            <p id="signup-error" class="form-error" role="alert"></p>
+            <div class="field">
+              <label for="signup-name">Full name</label>
+              <input type="text" id="signup-name" autocomplete="name" required aria-describedby="signup-name-error">
+              <p id="signup-name-error" class="field-error"></p>
+            </div>
+            <div class="field">
+              <label for="signup-email">Email address</label>
+              <input type="email" id="signup-email" autocomplete="email" spellcheck="false" required aria-describedby="signup-email-error">
+              <p id="signup-email-error" class="field-error"></p>
+            </div>
+            <div class="field">
+              <label for="signup-password">Password <span class="field__hint">(at least 8 characters)</span></label>
+              <div class="password-field">
+                <input type="password" id="signup-password" autocomplete="new-password" minlength="8" required aria-describedby="signup-password-error">
+                <button type="button" class="btn btn--ghost" data-password-toggle aria-controls="signup-password" aria-pressed="false">Show<span class="sr-only"> password</span></button>
+              </div>
+              <p id="signup-password-error" class="field-error"></p>
+            </div>
+            <p id="signup-privacy" class="field__hint">Your account lives only in this browser. Passwords are salted and hashed, never stored as plain text, and nothing is sent to a server.</p>
+            <button type="submit" class="btn btn--primary btn--block">Create account</button>
+          </form>
         </div>
       </div>
     </section>
 
-    <!-- 0b. Backup & restore -->
-    <section id="backup" class="section" aria-labelledby="backup-heading">
+    <!-- ===== View 2: Onboarding wizard ===== -->
+    <section id="onboarding-view" class="view wizard-view" aria-labelledby="wizard-title" hidden>
       <header class="section__header">
-        <h2 id="backup-heading" class="section__title" tabindex="-1">Back up <em>&amp; restore</em></h2>
-        <p class="section__intro">Save everything for <strong data-backup-owner>this guest profile</strong> (profile, recipes, meal plan, supplements and grocery checks) to a file you keep, then restore it on this or another device. The file is created on your device and goes nowhere unless you move it.</p>
-        <p id="storage-status" class="section__intro field__hint"></p>
+        <h1 id="wizard-title" class="section__title" tabindex="-1">Let's set <em>your table</em></h1>
+        <p id="wizard-intro" class="section__intro">Four short steps and your personal targets, plan and grocery list are ready.</p>
       </header>
 
-      <div class="backup-grid">
-        <div class="card">
-          <h3 id="export-heading">Download a backup</h3>
-          <form id="export-form" class="form" novalidate aria-labelledby="export-heading">
-            <div class="check">
-              <input type="checkbox" id="export-encrypt" aria-controls="export-passphrase-fields">
-              <label for="export-encrypt">Protect the file with a passphrase</label>
-            </div>
-            <div id="export-passphrase-fields" class="form" hidden>
-              <div class="field">
-                <label for="export-passphrase">Passphrase <span class="field__hint">(at least 8 characters)</span></label>
-                <input type="password" id="export-passphrase" autocomplete="new-password" minlength="8" aria-describedby="export-passphrase-hint export-passphrase-error">
-                <p id="export-passphrase-hint" class="field__hint">The file is encrypted with AES-GCM using a key stretched from this passphrase. Your account password works if you will remember it. A forgotten passphrase cannot be recovered.</p>
-                <p id="export-passphrase-error" class="field-error"></p>
-              </div>
-              <div class="field">
-                <label for="export-passphrase-confirm">Confirm passphrase</label>
-                <input type="password" id="export-passphrase-confirm" autocomplete="new-password" aria-describedby="export-passphrase-confirm-error">
-                <p id="export-passphrase-confirm-error" class="field-error"></p>
-              </div>
-            </div>
-            <button type="submit" class="btn btn--primary btn--block" id="btn-export">Download backup</button>
-          </form>
+      <div class="wizard-progress">
+        <p id="wizard-progress-label" class="wizard-progress__label"></p>
+        <div id="wizard-progressbar" class="bar wizard-progress__bar" role="progressbar" aria-labelledby="wizard-progress-label" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1">
+          <span id="wizard-progress-fill" class="bar__fill bar__fill--ok"></span>
         </div>
-
-        <div class="card">
-          <h3 id="import-heading">Restore from a backup</h3>
-          <form id="import-form" class="form" novalidate aria-labelledby="import-heading">
-            <div class="field">
-              <label for="import-file">Backup file <span class="field__hint">(.json from Ube Café)</span></label>
-              <input type="file" id="import-file" accept=".json,application/json" aria-describedby="import-file-error">
-              <p id="import-file-error" class="field-error"></p>
-            </div>
-            <div class="field" id="import-passphrase-field" hidden>
-              <label for="import-passphrase">Passphrase for this backup</label>
-              <input type="password" id="import-passphrase" autocomplete="off" aria-describedby="import-passphrase-error">
-              <p id="import-passphrase-error" class="field-error"></p>
-            </div>
-            <button type="submit" class="btn btn--secondary btn--block" id="btn-import-check">Check backup</button>
-          </form>
-
-          <div id="import-review" class="import-review" tabindex="-1" role="group" aria-labelledby="import-review-heading" hidden>
-            <h4 id="import-review-heading">This backup contains</h4>
-            <ul id="import-summary" class="import-review__list"></ul>
-            <p class="import-review__warning">Restoring replaces all current data for <strong data-backup-owner>this guest profile</strong> on this device. This cannot be undone, so download a backup first if you are unsure.</p>
-            <div class="button-row">
-              <button type="button" class="btn btn--primary" id="btn-import-confirm">Replace my data</button>
-              <button type="button" class="btn btn--ghost" id="btn-import-cancel">Cancel</button>
-            </div>
-          </div>
-        </div>
+        <ol id="wizard-steps" class="wizard-steps">
+          <li>Goals</li>
+          <li>Diet</li>
+          <li>Body</li>
+          <li>Recipe</li>
+        </ol>
       </div>
-    </section>
 
-    <!-- 1. Profile & targets -->
-    <section id="profile" class="section" aria-labelledby="profile-title">
-      <header class="section__header">
-        <h2 id="profile-title" class="section__title">Your body, <em>your numbers</em></h2>
-        <p class="section__intro">Targets use the Mifflin-St Jeor equation and NIH Dietary Reference Intakes. Everything stays on this device.</p>
-      </header>
-
-      <div class="split">
-        <form id="profile-form" class="card form" novalidate aria-describedby="profile-required">
-          <p id="profile-required" class="form__note">All fields are required except those marked optional.</p>
-
-          <fieldset class="field-group">
-            <legend>Measurement units</legend>
-            <div class="segmented">
-              <input type="radio" id="units-imperial" name="units" value="imperial">
-              <label for="units-imperial">Imperial (ft, lb)</label>
-              <input type="radio" id="units-metric" name="units" value="metric">
-              <label for="units-metric">Metric (cm, kg)</label>
-            </div>
-          </fieldset>
-
-          <div class="form__grid">
-            <div class="field">
-              <label for="age">Age <span class="field__hint">(years)</span></label>
-              <input type="number" id="age" name="age" min="14" max="100" step="1" inputmode="numeric" required aria-describedby="age-error">
-              <p id="age-error" class="field-error"></p>
-            </div>
-            <div class="field">
-              <label for="gender">Biological sex</label>
-              <select id="gender" name="gender" aria-describedby="gender-hint">
-                <option value="female">Female</option>
-                <option value="male">Male</option>
-                <option value="other">Prefer not to say</option>
-              </select>
-              <p id="gender-hint" class="field__hint">Used by the calorie and RDA equations. “Prefer not to say” averages the male and female values.</p>
-            </div>
-          </div>
-
-          <fieldset class="field-group" data-units="imperial">
-            <legend>Height</legend>
-            <div class="form__grid">
-              <div class="field">
-                <label for="height-ft">Feet</label>
-                <input type="number" id="height-ft" name="height-ft" min="3" max="8" step="1" inputmode="numeric" required aria-describedby="height-ft-error">
-                <p id="height-ft-error" class="field-error"></p>
-              </div>
-              <div class="field">
-                <label for="height-in">Inches</label>
-                <input type="number" id="height-in" name="height-in" min="0" max="11.9" step="0.1" inputmode="decimal" required aria-describedby="height-in-error">
-                <p id="height-in-error" class="field-error"></p>
-              </div>
-            </div>
-          </fieldset>
-          <div class="field" data-units="metric" hidden>
-            <label for="height-cm">Height <span class="field__hint">(cm)</span></label>
-            <input type="number" id="height-cm" name="height-cm" min="100" max="250" step="0.1" inputmode="decimal" required aria-describedby="height-cm-error">
-            <p id="height-cm-error" class="field-error"></p>
-          </div>
-
-          <div class="field" data-units="imperial">
-            <label for="weight-lb">Weight <span class="field__hint">(lb)</span></label>
-            <input type="number" id="weight-lb" name="weight-lb" min="66" max="700" step="0.1" inputmode="decimal" required aria-describedby="weight-lb-error">
-            <p id="weight-lb-error" class="field-error"></p>
-          </div>
-          <div class="field" data-units="metric" hidden>
-            <label for="weight-kg">Weight <span class="field__hint">(kg)</span></label>
-            <input type="number" id="weight-kg" name="weight-kg" min="30" max="320" step="0.1" inputmode="decimal" required aria-describedby="weight-kg-error">
-            <p id="weight-kg-error" class="field-error"></p>
-          </div>
-
-          <fieldset class="field-group measurements">
-            <legend>Advanced body measurements <span class="field__hint">(optional)</span></legend>
-            <p id="measurements-hint" class="field__hint">Adds BMI context, waist-to-hip and waist-to-height ratios, and lean body mass.</p>
-            <div class="form__grid form__grid--three">
-              <div class="field">
-                <label for="body-fat">Body fat <span class="field__hint">(%)</span></label>
-                <input type="number" id="body-fat" name="body-fat" min="3" max="60" step="0.1" inputmode="decimal" placeholder="e.g. 18.5" aria-describedby="measurements-hint body-fat-error">
-                <p id="body-fat-error" class="field-error"></p>
-              </div>
-              <div class="field">
-                <label for="waist">Waist <span class="field__hint" data-length-unit>(in)</span></label>
-                <input type="number" id="waist" name="waist" data-length inputmode="decimal" aria-describedby="measurements-hint waist-error">
-                <p id="waist-error" class="field-error"></p>
-              </div>
-              <div class="field">
-                <label for="hip">Hip <span class="field__hint" data-length-unit>(in)</span></label>
-                <input type="number" id="hip" name="hip" data-length inputmode="decimal" aria-describedby="measurements-hint hip-error">
-                <p id="hip-error" class="field-error"></p>
-              </div>
-            </div>
-          </fieldset>
-
-          <div class="field">
-            <label for="activity">Activity level</label>
-            <select id="activity" name="activity">
-              <option value="sedentary">Sedentary: desk job, little exercise</option>
-              <option value="light">Lightly active: exercise 1–3 days/week</option>
-              <option value="moderate">Moderately active: exercise 3–5 days/week</option>
-              <option value="active">Very active: hard exercise 6–7 days/week</option>
-              <option value="athlete">Athlete: twice-daily or physical job</option>
-            </select>
-          </div>
-
+      <div class="card wizard">
+        <section class="wizard-step form" data-step="1" aria-labelledby="step-1-title">
+          <h2 id="step-1-title" tabindex="-1">Goals &amp; activity</h2>
           <fieldset class="field-group">
             <legend>Primary goal</legend>
             <div class="segmented segmented--three">
@@ -403,198 +266,307 @@
               <label for="goal-gain">Muscle gain</label>
             </div>
           </fieldset>
+          <div class="field">
+            <label for="goal-timeline">Target timeline</label>
+            <select id="goal-timeline" aria-describedby="timeline-hint"></select>
+            <p id="timeline-hint" class="field__hint">Shorter timelines use a larger calorie adjustment, capped for safety. Maintenance ignores the timeline.</p>
+          </div>
+          <div class="field">
+            <label for="activity">Daily activity level</label>
+            <select id="activity">
+              <option value="sedentary">Sedentary: desk job, little exercise</option>
+              <option value="light">Lightly active: exercise 1–3 days/week</option>
+              <option value="moderate">Moderately active: exercise 3–5 days/week</option>
+              <option value="active">Very active: hard exercise 6–7 days/week</option>
+              <option value="athlete">Athlete: twice-daily or physical job</option>
+            </select>
+          </div>
+        </section>
 
-          <button type="submit" class="btn btn--primary btn--block">Save profile &amp; recalculate</button>
-          <p id="profile-saved" class="form__note"></p>
-        </form>
-
-        <div id="targets-output" class="card targets" aria-live="polite"></div>
-      </div>
-    </section>
-
-    <!-- 2. Dashboard -->
-    <section id="dashboard" class="section section--sky" aria-labelledby="dashboard-title">
-      <svg class="botanical botanical--edge-right" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
-      <header class="section__header">
-        <h2 id="dashboard-title" class="section__title">Today's <em>cup of nutrients</em></h2>
-        <p class="section__intro">Intake is the sum of one serving of each meal planned for the selected day.</p>
-      </header>
-
-      <div class="toolbar card">
-        <div class="field field--inline">
-          <label for="view-day">Viewing day</label>
-          <select id="view-day"></select>
-        </div>
-        <p id="dashboard-summary" class="toolbar__summary" aria-live="polite"></p>
-      </div>
-
-      <div class="dashboard-grid">
-        <article class="card" aria-labelledby="macro-title">
-          <h3 id="macro-title">Macronutrients</h3>
-          <ul id="macro-list" class="nutrient-list"></ul>
-        </article>
-        <article class="card" aria-labelledby="micro-title">
-          <h3 id="micro-title">Micronutrients</h3>
-          <ul id="micro-list" class="nutrient-list"></ul>
-        </article>
-      </div>
-      <p class="legend-note">
-        <span class="badge badge--ok"><span aria-hidden="true">✓</span> Met</span> 80% or more ·
-        <span class="badge badge--warn"><span aria-hidden="true">!</span> Low</span> 50–79% ·
-        <span class="badge badge--danger"><span aria-hidden="true">✕</span> Deficient</span> under 50% of the RDA.
-      </p>
-    </section>
-
-    <!-- 3. Recommendations -->
-    <section id="recommendations" class="section" aria-labelledby="recs-title">
-      <header class="section__header">
-        <svg class="sprig" aria-hidden="true" focusable="false"><use href="#sprig"/></svg>
-        <h2 id="recs-title" class="section__title">Which food, <em>and why</em></h2>
-        <p class="section__intro">Plain if/else rules compare <span data-day-label></span>'s totals against your targets. No guesswork, no AI.</p>
-      </header>
-      <ul id="recommendation-list" class="card-grid" aria-live="polite"></ul>
-    </section>
-
-    <!-- 4. Weekly planner -->
-    <section id="planner" class="section section--sky" aria-labelledby="planner-title">
-      <svg class="botanical botanical--edge-left" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
-      <header class="section__header">
-        <h2 id="planner-title" class="section__title">The week <em>on the menu</em></h2>
-        <p class="section__intro">Choose a recipe for each meal. Changes save automatically and update your dashboard and grocery list.</p>
-      </header>
-      <div id="planner-grid" class="planner-grid"></div>
-      <div class="button-row button-row--center">
-        <button type="button" id="clear-week" class="btn btn--secondary">Clear week</button>
-      </div>
-    </section>
-
-    <!-- 5. Schedule & supplements -->
-    <section id="schedule" class="section" aria-labelledby="schedule-title">
-      <header class="section__header">
-        <h2 id="schedule-title" class="section__title">A gentle rhythm <em>for the day</em></h2>
-        <p class="section__intro">Timeline for <span data-day-label></span>. Supplements are placed by absorption rules: fat-soluble with your fattiest meal, iron with vitamin C and away from calcium and coffee, magnesium in the evening.</p>
-      </header>
-      <div class="split split--schedule">
-        <!-- [html-validate-disable-next wcag/h32 -- choices apply instantly on change; there is nothing to submit] -->
-        <form id="supplement-form" class="card form" aria-labelledby="supplement-legend">
+        <section class="wizard-step form" data-step="2" aria-labelledby="step-2-title" hidden>
+          <h2 id="step-2-title" tabindex="-1">Diet &amp; allergies</h2>
           <fieldset class="field-group">
-            <legend id="supplement-legend">Supplements you take</legend>
-            <div id="supplement-options" class="check-grid"></div>
+            <legend>Dietary pattern</legend>
+            <div id="diet-options" class="choice-grid"></div>
           </fieldset>
+          <fieldset class="field-group" aria-describedby="allergy-hint">
+            <legend>Allergies &amp; sensitivities</legend>
+            <p id="allergy-hint" class="field__hint">Recipes are scanned for these. Each match is swapped for a safe, nutritionally similar substitute, or the recipe is left out of your plan and grocery list.</p>
+            <div id="allergy-options" class="check-grid"></div>
+          </fieldset>
+        </section>
+
+        <section class="wizard-step form" data-step="3" aria-labelledby="step-3-title" hidden>
+          <h2 id="step-3-title" tabindex="-1">Body composition &amp; biometrics</h2>
+          <p class="form__note">All fields are required except those marked optional.</p>
           <fieldset class="field-group">
-            <legend>Habits</legend>
-            <div class="check">
-              <input type="checkbox" id="coffee-breakfast" name="coffee">
-              <label for="coffee-breakfast">I drink coffee or tea with breakfast</label>
+            <legend>Measurement units</legend>
+            <div class="segmented">
+              <input type="radio" id="units-imperial" name="units" value="imperial">
+              <label for="units-imperial">Imperial (ft, lb)</label>
+              <input type="radio" id="units-metric" name="units" value="metric">
+              <label for="units-metric">Metric (cm, kg)</label>
             </div>
           </fieldset>
-        </form>
-        <ol id="timeline" class="timeline"></ol>
+          <div class="form__grid">
+            <div class="field">
+              <label for="age">Age <span class="field__hint">(years)</span></label>
+              <input type="number" id="age" min="14" max="100" step="1" inputmode="numeric" required aria-describedby="age-error">
+              <p id="age-error" class="field-error"></p>
+            </div>
+            <div class="field">
+              <label for="sex">Biological sex</label>
+              <select id="sex" aria-describedby="sex-hint">
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+                <option value="other">Prefer not to say</option>
+              </select>
+              <p id="sex-hint" class="field__hint">Used by the calorie and RDA equations. “Prefer not to say” averages both.</p>
+            </div>
+          </div>
+          <fieldset class="field-group" data-units="imperial">
+            <legend>Height</legend>
+            <div class="form__grid">
+              <div class="field">
+                <label for="height-ft">Feet</label>
+                <input type="number" id="height-ft" min="3" max="8" step="1" inputmode="numeric" required aria-describedby="height-ft-error">
+                <p id="height-ft-error" class="field-error"></p>
+              </div>
+              <div class="field">
+                <label for="height-in">Inches</label>
+                <input type="number" id="height-in" min="0" max="11.9" step="0.1" inputmode="decimal" required aria-describedby="height-in-error">
+                <p id="height-in-error" class="field-error"></p>
+              </div>
+            </div>
+          </fieldset>
+          <div class="field" data-units="metric" hidden>
+            <label for="height-cm">Height <span class="field__hint">(cm)</span></label>
+            <input type="number" id="height-cm" min="100" max="250" step="0.1" inputmode="decimal" required aria-describedby="height-cm-error">
+            <p id="height-cm-error" class="field-error"></p>
+          </div>
+          <div class="field" data-units="imperial">
+            <label for="weight-lb">Weight <span class="field__hint">(lb)</span></label>
+            <input type="number" id="weight-lb" min="66" max="700" step="0.1" inputmode="decimal" required aria-describedby="weight-lb-error">
+            <p id="weight-lb-error" class="field-error"></p>
+          </div>
+          <div class="field" data-units="metric" hidden>
+            <label for="weight-kg">Weight <span class="field__hint">(kg)</span></label>
+            <input type="number" id="weight-kg" min="30" max="320" step="0.1" inputmode="decimal" required aria-describedby="weight-kg-error">
+            <p id="weight-kg-error" class="field-error"></p>
+          </div>
+          <fieldset class="field-group measurements">
+            <legend>Advanced measurements <span class="field__hint">(optional)</span></legend>
+            <p id="measurements-hint" class="field__hint">Unlocks waist-to-hip and waist-to-height ratios and a lean-mass BMR estimate.</p>
+            <div class="form__grid form__grid--four">
+              <div class="field">
+                <label for="body-fat">Body fat <span class="field__hint">(%)</span></label>
+                <input type="number" id="body-fat" min="3" max="60" step="0.1" inputmode="decimal" aria-describedby="measurements-hint body-fat-error">
+                <p id="body-fat-error" class="field-error"></p>
+              </div>
+              <div class="field">
+                <label for="waist">Waist <span class="field__hint" data-length-unit></span></label>
+                <input type="number" id="waist" data-length inputmode="decimal" aria-describedby="measurements-hint waist-error">
+                <p id="waist-error" class="field-error"></p>
+              </div>
+              <div class="field">
+                <label for="hip">Hip <span class="field__hint" data-length-unit></span></label>
+                <input type="number" id="hip" data-length inputmode="decimal" aria-describedby="measurements-hint hip-error">
+                <p id="hip-error" class="field-error"></p>
+              </div>
+              <div class="field">
+                <label for="lean-mass">Lean body mass <span class="field__hint" data-mass-unit></span></label>
+                <input type="number" id="lean-mass" data-mass inputmode="decimal" aria-describedby="measurements-hint lean-mass-error">
+                <p id="lean-mass-error" class="field-error"></p>
+              </div>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="wizard-step" data-step="4" aria-labelledby="step-4-title" hidden>
+          <h2 id="step-4-title" tabindex="-1">Add your first recipe</h2>
+          <p class="section__intro section__intro--left">Paste a recipe or scan a photo. It is checked against your allergies and diet right away. You can also skip this and use the sample library.</p>
+          <div id="onboarding-importer" class="importer"></div>
+          <div id="onboarding-added" class="onboarding-added" aria-live="polite"></div>
+        </section>
+
+        <div class="wizard-nav">
+          <button type="button" id="wizard-back" class="btn btn--secondary">Back</button>
+          <button type="button" id="wizard-signout" class="btn btn--ghost">Sign out</button>
+          <button type="button" id="wizard-cancel" class="btn btn--ghost" hidden>Cancel</button>
+          <button type="button" id="wizard-save" class="btn btn--secondary" hidden>Save &amp; close</button>
+          <button type="button" id="wizard-next" class="btn btn--primary">Continue</button>
+        </div>
       </div>
     </section>
 
-    <!-- 6. Recipe importer -->
-    <section id="recipes" class="section section--sky" aria-labelledby="recipes-title">
-      <svg class="botanical botanical--edge-right" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
-      <header class="section__header">
-        <h2 id="recipes-title" class="section__title">Bring your <em>recipes home</em></h2>
-        <p class="section__intro">Paste a recipe or scan a photo. Ingredients are matched against a built-in nutrition dictionary of 50+ foods.</p>
-      </header>
-
-      <div class="import-grid">
-        <article class="card" aria-labelledby="paste-title">
-          <h3 id="paste-title">Paste recipe text</h3>
-          <div class="field">
-            <label for="raw-recipe">Raw recipe</label>
-            <textarea id="raw-recipe" rows="9" aria-describedby="raw-hint" placeholder="Title: Morning Oats&#10;Servings: 2&#10;Ingredients:&#10;- 1 cup rolled oats&#10;- 2 cups milk&#10;Instructions:&#10;1. Simmer for 5 minutes."></textarea>
-            <p id="raw-hint" class="field__hint">Include “Ingredients” and “Instructions” headings. Title and servings lines are optional.</p>
-          </div>
-          <button type="button" id="parse-raw" class="btn btn--secondary">Parse into form</button>
-        </article>
-
-        <article class="card" aria-labelledby="ocr-title">
-          <h3 id="ocr-title">Scan a recipe photo</h3>
-          <!-- [html-validate-disable-next prefer-native-element -- also a drag-and-drop target; keyboard activation is handled in js/ui/recipes.js] -->
-          <div id="ocr-dropzone" class="dropzone" role="button" tabindex="0" aria-describedby="ocr-hint">
-            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="32" height="32"><path d="M4 7h3l2-3h6l2 3h3v13H4z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-            <span class="dropzone__title">Choose or drop a photo</span>
-          </div>
-          <p id="ocr-hint" class="field__hint">Text is read on your device by Tesseract.js in a background worker: your photo is never uploaded. The first scan downloads about 5&nbsp;MB of OCR engine and English language data from jsDelivr, which your browser then keeps. Clear, printed recipes in English work best.</p>
-          <input type="file" id="ocr-file" accept="image/*" hidden>
-          <div class="button-row ocr-actions">
-            <button type="button" id="ocr-sample" class="btn btn--ghost">Try a sample photo</button>
-            <button type="button" id="ocr-cancel" class="btn btn--ghost" hidden>Cancel scan</button>
-          </div>
-          <label for="ocr-progress" class="sr-only">Text extraction progress</label>
-          <progress id="ocr-progress" max="100" value="0" hidden></progress>
-          <p id="ocr-status" class="ocr-status" role="status" aria-live="polite"></p>
-          <!-- [html-validate-disable-next element-required-attributes -- src is set from the chosen photo at runtime; hidden until then] -->
-          <img id="ocr-preview" class="ocr-preview" alt="" hidden>
-        </article>
+    <!-- ===== View 3: Main app ===== -->
+    <div id="app-view" class="view" hidden>
+      <div class="app-intro">
+        <h1 id="app-title" class="section__title" tabindex="-1">Good to see you, <em id="app-name"></em></h1>
+        <p id="app-summary" class="section__intro"></p>
       </div>
 
-      <form id="recipe-form" class="card form recipe-form" novalidate aria-labelledby="recipe-form-title">
-        <h3 id="recipe-form-title">Recipe details</h3>
-        <div class="form__grid form__grid--title">
-          <div class="field">
-            <label for="recipe-title">Title</label>
-            <input type="text" id="recipe-title" name="recipe-title" autocomplete="off" required aria-describedby="recipe-title-error">
-            <p id="recipe-title-error" class="field-error"></p>
-          </div>
-          <div class="field">
-            <label for="recipe-servings">Servings</label>
-            <input type="number" id="recipe-servings" name="recipe-servings" min="1" max="50" step="1" value="1" inputmode="numeric" required aria-describedby="recipe-servings-error">
-            <p id="recipe-servings-error" class="field-error"></p>
-          </div>
+      <nav class="app-nav" aria-label="App sections">
+        <div id="app-tablist" class="app-tabs" role="tablist" aria-label="App sections">
+          <button type="button" role="tab" id="tab-dashboard" aria-controls="panel-dashboard" aria-selected="true">Dashboard &amp; Targets</button>
+          <button type="button" role="tab" id="tab-recipes" aria-controls="panel-recipes" aria-selected="false" tabindex="-1">Recipe Library &amp; Importer</button>
+          <button type="button" role="tab" id="tab-planner" aria-controls="panel-planner" aria-selected="false" tabindex="-1">Weekly Planner &amp; Schedule</button>
+          <button type="button" role="tab" id="tab-grocery" aria-controls="panel-grocery" aria-selected="false" tabindex="-1">Smart Grocery List</button>
         </div>
-        <div class="form__grid">
-          <div class="field">
-            <label for="recipe-ingredients">Ingredients <span class="field__hint">(one per line)</span></label>
-            <textarea id="recipe-ingredients" name="recipe-ingredients" rows="8" required aria-describedby="recipe-ingredients-hint recipe-ingredients-error"></textarea>
-            <p id="recipe-ingredients-hint" class="field__hint">Examples: “1 1/2 cups rolled oats”, “200 g spinach”, “2 large eggs”.</p>
-            <p id="recipe-ingredients-error" class="field-error"></p>
-          </div>
-          <div class="field">
-            <label for="recipe-instructions">Instructions <span class="field__hint">(optional)</span></label>
-            <textarea id="recipe-instructions" name="recipe-instructions" rows="8"></textarea>
-          </div>
-        </div>
-        <div class="button-row">
-          <button type="button" id="analyze-recipe" class="btn btn--secondary">Analyze nutrition</button>
-          <button type="submit" id="save-recipe" class="btn btn--primary">Save recipe</button>
-          <button type="button" id="cancel-edit" class="btn btn--ghost" hidden>Cancel edit</button>
-        </div>
-        <div id="analysis-output" class="analysis" aria-live="polite"></div>
-      </form>
-    </section>
+      </nav>
 
-    <!-- 7. Recipe library -->
-    <section id="library" class="section" aria-labelledby="library-heading">
-      <header class="section__header">
-        <h2 id="library-heading" class="section__title" tabindex="-1">The recipe <em>library</em> <span class="count-pill">(<span id="recipe-count">0</span>)</span></h2>
-        <p class="section__intro">Nutrition shown per serving. Edit a recipe to re-analyze it.</p>
-      </header>
-      <ul id="recipe-library" class="card-grid"></ul>
-    </section>
+      <!-- Panel: Dashboard & Targets -->
+      <div id="panel-dashboard" class="tab-panel" role="tabpanel" aria-labelledby="tab-dashboard">
+        <section class="section section--sky" aria-labelledby="dashboard-title">
+          <svg class="botanical botanical--edge-right" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
+          <header class="section__header">
+            <h2 id="dashboard-title" class="section__title">Today's <em>cup of nutrients</em></h2>
+            <p class="section__intro">Intake is one serving of each meal planned for the selected day, after allergy and diet swaps.</p>
+          </header>
+          <div class="toolbar card">
+            <div class="field field--inline">
+              <label for="view-day">Viewing day</label>
+              <select id="view-day" data-day-select></select>
+            </div>
+            <p id="dashboard-summary" class="toolbar__summary" aria-live="polite"></p>
+          </div>
+          <div class="two-col">
+            <article class="card" aria-labelledby="macro-title">
+              <h3 id="macro-title">Macronutrients</h3>
+              <ul id="macro-list" class="nutrient-list"></ul>
+            </article>
+            <article class="card" aria-labelledby="micro-title">
+              <h3 id="micro-title">Micronutrients</h3>
+              <ul id="micro-list" class="nutrient-list"></ul>
+            </article>
+          </div>
+          <p class="legend-note">
+            <span class="badge badge--ok"><span aria-hidden="true">✓</span> Met</span> 80% or more ·
+            <span class="badge badge--warn"><span aria-hidden="true">!</span> Low</span> 50–79% ·
+            <span class="badge badge--danger"><span aria-hidden="true">✕</span> Deficient</span> under 50% of the RDA.
+          </p>
+        </section>
 
-    <!-- 8. Grocery list -->
-    <section id="grocery" class="section section--sky" aria-labelledby="grocery-title">
-      <svg class="botanical botanical--edge-left" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
-      <header class="section__header">
-        <h2 id="grocery-title" class="section__title">Sunday <em>market list</em></h2>
-        <p class="section__intro">Every ingredient from Monday to Sunday, merged, summed and sorted by aisle. <span id="shopping-day"></span></p>
-      </header>
-      <div class="toolbar card">
-        <div class="field field--inline">
-          <label for="household-size">People to shop for</label>
-          <input type="number" id="household-size" min="1" max="12" step="1" inputmode="numeric">
-        </div>
-        <p id="grocery-progress" class="toolbar__summary" role="status" aria-live="polite"></p>
-        <button type="button" id="uncheck-all" class="btn btn--ghost">Uncheck all</button>
+        <section class="section" aria-labelledby="recs-title">
+          <header class="section__header">
+            <svg class="sprig" aria-hidden="true" focusable="false"><use href="#sprig"/></svg>
+            <h2 id="recs-title" class="section__title">Which food, <em>and why</em></h2>
+            <p class="section__intro">Plain if/else rules compare <span data-day-label></span>'s totals against your targets, skipping foods that clash with your diet or allergies.</p>
+          </header>
+          <ul id="recommendation-list" class="card-grid" aria-live="polite"></ul>
+        </section>
+
+        <section class="section section--sky" aria-labelledby="targets-title">
+          <header class="section__header">
+            <h2 id="targets-title" class="section__title">Your body, <em>your numbers</em></h2>
+            <p class="section__intro">Mifflin-St Jeor energy needs and NIH Dietary Reference Intakes, tuned to your goal, timeline and diet.</p>
+          </header>
+          <div id="targets-output" class="two-col"></div>
+        </section>
       </div>
-      <div id="grocery-list" class="grocery-grid"></div>
-    </section>
+
+      <!-- Panel: Recipes -->
+      <div id="panel-recipes" class="tab-panel" role="tabpanel" aria-labelledby="tab-recipes" hidden>
+        <section class="section section--sky" aria-labelledby="importer-title">
+          <svg class="botanical botanical--edge-right" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
+          <header class="section__header">
+            <h2 id="importer-title" class="section__title">Bring your <em>recipes home</em></h2>
+            <p class="section__intro">Paste a recipe or scan a photo. Ingredients are matched against a built-in nutrition dictionary and screened for your allergies and diet.</p>
+          </header>
+          <div id="library-importer" class="importer"></div>
+        </section>
+        <section class="section" aria-labelledby="library-heading">
+          <header class="section__header">
+            <h2 id="library-heading" class="section__title" tabindex="-1">The recipe <em>library</em> <span class="count-pill">(<span id="recipe-count">0</span>)</span></h2>
+            <p class="section__intro">Nutrition per serving, with your swaps applied. Edit a recipe to re-analyze it.</p>
+          </header>
+          <ul id="recipe-library" class="card-grid"></ul>
+        </section>
+      </div>
+
+      <!-- Panel: Planner & schedule -->
+      <div id="panel-planner" class="tab-panel" role="tabpanel" aria-labelledby="tab-planner" hidden>
+        <section class="section section--sky" aria-labelledby="planner-title">
+          <svg class="botanical botanical--edge-left" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
+          <header class="section__header">
+            <h2 id="planner-title" class="section__title">The week <em>on the menu</em></h2>
+            <p class="section__intro">Choose a recipe for each meal. Recipes that can't be made safe for your allergies are unavailable.</p>
+          </header>
+          <div id="planner-grid" class="card-grid"></div>
+          <div class="button-row button-row--center">
+            <button type="button" id="clear-week" class="btn btn--secondary">Clear week</button>
+          </div>
+        </section>
+        <section class="section" aria-labelledby="schedule-title">
+          <header class="section__header">
+            <h2 id="schedule-title" class="section__title">A gentle rhythm <em>for the day</em></h2>
+            <p class="section__intro">Supplements placed by absorption rules: fat-soluble vitamins with your fattiest meal, iron with vitamin C and away from calcium and coffee, magnesium in the evening.</p>
+          </header>
+          <div class="split">
+            <form id="supplement-form" class="card form" aria-labelledby="supplement-legend">
+              <div class="field">
+                <label for="schedule-day">Schedule for</label>
+                <select id="schedule-day" data-day-select></select>
+              </div>
+              <fieldset class="field-group">
+                <legend id="supplement-legend">Supplements you take</legend>
+                <div id="supplement-options" class="check-grid"></div>
+              </fieldset>
+              <fieldset class="field-group">
+                <legend>Habits</legend>
+                <div class="check">
+                  <input type="checkbox" id="coffee-breakfast">
+                  <label for="coffee-breakfast">I drink coffee or tea with breakfast</label>
+                </div>
+              </fieldset>
+            </form>
+            <ol id="timeline" class="timeline" aria-label="Meal and supplement timeline"></ol>
+          </div>
+        </section>
+      </div>
+
+      <!-- Panel: Grocery -->
+      <div id="panel-grocery" class="tab-panel" role="tabpanel" aria-labelledby="tab-grocery" hidden>
+        <section class="section section--sky" aria-labelledby="grocery-title">
+          <svg class="botanical botanical--edge-left" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
+          <header class="section__header">
+            <h2 id="grocery-title" class="section__title">Sunday <em>market list</em></h2>
+            <p class="section__intro">Every ingredient from Monday to Sunday, with your allergy and diet swaps, merged, summed and sorted by aisle. <span id="shopping-day"></span></p>
+          </header>
+          <div class="toolbar card">
+            <div class="field field--inline">
+              <label for="household-size">People to shop for</label>
+              <input type="number" id="household-size" min="1" max="12" step="1" inputmode="numeric">
+            </div>
+            <p id="grocery-progress" class="toolbar__summary" role="status" aria-live="polite"></p>
+            <button type="button" id="uncheck-all" class="btn btn--ghost">Uncheck all</button>
+          </div>
+          <div id="grocery-list" class="card-grid"></div>
+        </section>
+      </div>
+    </div>
   </main>
+
+  <!-- Profile drawer -->
+  <dialog id="profile-drawer" class="drawer" aria-labelledby="drawer-title">
+    <div class="drawer__header">
+      <h2 id="drawer-title">Your profile</h2>
+      <button type="button" id="drawer-close" class="btn btn--ghost" aria-label="Close profile">
+        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <p id="drawer-name" class="drawer__name"></p>
+    <p id="drawer-email" class="drawer__email"></p>
+    <h3>Body composition</h3>
+    <dl id="drawer-body" class="drawer-list"></dl>
+    <h3>Preferences</h3>
+    <dl id="drawer-prefs" class="drawer-list"></dl>
+    <div class="drawer__actions">
+      <button type="button" id="drawer-edit" class="btn btn--primary btn--block">Edit preferences</button>
+      <button type="button" id="drawer-signout" class="btn btn--secondary btn--block">Sign out</button>
+      <button type="button" id="drawer-delete" class="btn btn--ghost btn--danger btn--block">Delete account</button>
+    </div>
+  </dialog>
 
   <footer class="site-footer">
     <div class="site-footer__inner">
@@ -602,20 +574,11 @@
         <p class="brand brand--footer"><svg class="brand__mark" aria-hidden="true" focusable="false"><use href="#sprig"/></svg><span class="brand__name">Ube <em>Café</em></span></p>
         <p>Warm, dependable meal planning, brewed from transparent rules.</p>
       </div>
-      <p class="site-footer__disclaimer">Educational tool only. Not medical advice. Consult a registered dietitian or physician before changing your diet or starting supplements, especially if pregnant, nursing or managing a health condition.</p>
+      <p class="site-footer__disclaimer">Educational tool only. Not medical advice. Substitutions are suggestions: always check product labels for allergens and cross-contact. Consult a registered dietitian or physician before changing your diet or starting supplements.</p>
     </div>
     <p class="site-footer__copy">© <span id="year">2026</span> Ube Café. Nutrient data adapted from USDA FoodData Central.</p>
   </footer>
 
-  <dialog id="recipe-dialog" class="recipe-dialog" aria-labelledby="recipe-view-title">
-    <div class="recipe-dialog__bar">
-      <button type="button" class="btn btn--ghost" data-dialog-action="edit">Edit recipe</button>
-      <button type="button" class="btn btn--ghost" data-dialog-action="print">Print</button>
-      <button type="button" class="btn btn--secondary" data-dialog-action="close">Close<span class="sr-only"> recipe</span></button>
-    </div>
-    <div id="recipe-dialog-body" class="recipe-view"></div>
-  </dialog>
-
-  <script type="module" src="js/main.js"></script>
+  <script src="script.js" defer></script>
 </body>
 </html>
