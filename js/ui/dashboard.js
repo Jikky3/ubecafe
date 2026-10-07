@@ -72,9 +72,14 @@ export const TargetsUI = {
     const metric = profile.units === 'metric';
     const mass = (kg) => (metric ? `${fmt(Math.abs(kg))} kg` : `${fmt(Math.abs(kg) / KG_PER_LB)} lb`);
     const goal = NutritionEngine.GOALS[profile.goal].label;
+    // The safety floor (1,200 / 1,500 kcal) can sit above a small, sedentary body's TDEE,
+    // so a loss goal would project a gain; say so instead of promising weight loss.
+    const floorBlocksLoss = profile.goal === 'loss' && projectedKg >= 0;
     const projection = profile.goal === 'maintain'
       ? 'Maintenance: calories match your daily energy expenditure.'
-      : `${goal} over ${profile.timelineWeeks} weeks (${pace.toLowerCase()} pace): about ${mass(projectedKg)} ${projectedKg < 0 ? 'lost' : 'gained'} if followed consistently.`;
+      : floorBlocksLoss
+        ? `Your daily target is held at the ${fmt(targets.calories)} kcal safety minimum, which is at or above the ${fmt(tdee)} kcal you use each day, so this plan is not expected to cause weight loss. Talk to a registered dietitian or doctor about a safe approach.`
+        : `${goal} over ${profile.timelineWeeks} weeks (${pace.toLowerCase()} pace): about ${mass(projectedKg)} ${projectedKg < 0 ? 'lost' : 'gained'} if followed consistently.`;
     const ketoNote = profile.diet === 'keto' ? '<p class="field__hint">Keto: carbohydrates capped at 30 g, with fat filling the remaining energy.</p>' : '';
     const rows = NUTRIENTS.map((meta) => `
       <tr><th scope="row">${meta.label}${meta.isLimit ? ' (max)' : ''}</th><td>${fmt(targets[meta.key])} ${meta.unit}</td></tr>`).join('');
