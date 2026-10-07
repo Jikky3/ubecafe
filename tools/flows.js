@@ -3,11 +3,14 @@
 /**
  * Creates an account and completes the four onboarding steps, ending on the dashboard.
  * @param {import('playwright-core').Page} page
- * @param {{ name?: string, email?: string, password?: string, onStep?: (step: number) => Promise<void> }} [options]
+ * @param {{ name?: string, email?: string, password?: string, onStep?: (step: number) => Promise<void>,
+ *   stopAtStep?: number }} [options]
  *   onStep runs once each wizard step is visible (e.g. for an accessibility scan).
+ *   stopAtStep (1–4) returns as soon as that wizard step is shown, without continuing; by default
+ *   all four steps are completed.
  */
 export const signUpAndOnboard = async (page, {
-  name = 'Ana Cruz', email = 'ana@example.com', password = 'correct horse', onStep,
+  name = 'Ana Cruz', email = 'ana@example.com', password = 'correct horse', onStep, stopAtStep,
 } = {}) => {
   await page.click('#tab-signup');
   await page.fill('#signup-name', name);
@@ -25,6 +28,7 @@ export const signUpAndOnboard = async (page, {
       await page.fill('#weight-lb', '150');
     }
     await onStep?.(step);
+    if (step === stopAtStep) return;
     await page.click('#wizard-next');
   }
   await page.locator('#app-view').waitFor({ state: 'visible' });

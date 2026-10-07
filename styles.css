@@ -2060,4 +2060,11 @@ input[type="file"]::file-selector-button {
 .drawer__card + .drawer__card {
   padding-top: var(--space-4);
   border-top: 1px dashed var(--line);
+/* Photo OCR controls inside each recipe importer (js/ui/ocr.js). */
+.ocr-actions {
+  margin-top: var(--space-3);
+}
+
+.ocr-preview-host:empty {
+  display: none;
 }

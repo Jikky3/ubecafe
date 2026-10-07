@@ -3,6 +3,7 @@ import { RecipeManager } from '../engines/recipe-manager.js';
 import { SubstitutionEngine } from '../engines/substitution.js';
 import { analyzeForUser, blockedHits, state } from '../state.js';
 import { RecipeLibrary } from './library.js';
+import { OCR_HINT_HTML, OcrController } from './ocr.js';
 import { setFieldError } from './tabs.js';
 import { announce, createId, escapeHTML, fmt } from '../util.js';
 
@@ -16,7 +17,6 @@ export class RecipeImporter {
     this.p = prefix;
     this.onSaved = onSaved;
     this.editingId = null;
-    this.previewUrl = null;
     root.innerHTML = this.markup();
     this.bind();
   }
@@ -44,12 +44,16 @@ export class RecipeImporter {
             <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="32" height="32"><path d="M4 7h3l2-3h6l2 3h3v13H4z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
             <span class="dropzone__title">Choose or drop a photo</span>
           </div>
-          <p id="${p}-ocr-hint" class="field__hint">Simulated OCR for demonstration: your image never leaves this device, and a sample recipe text is extracted.</p>
+          <p id="${p}-ocr-hint" class="field__hint">${OCR_HINT_HTML}</p>
           <input type="file" id="${p}-file" accept="image/*" hidden>
+          <div class="button-row ocr-actions">
+            <button type="button" id="${p}-sample" class="btn btn--ghost">Try a sample photo</button>
+            <button type="button" id="${p}-ocr-cancel" class="btn btn--ghost" hidden>Cancel scan</button>
+          </div>
           <label for="${p}-progress" class="sr-only">Text extraction progress</label>
           <progress id="${p}-progress" class="ocr-progress" max="100" value="0" hidden></progress>
           <p id="${p}-status" class="ocr-status" role="status" aria-live="polite"></p>
-          <img id="${p}-preview" class="ocr-preview" alt="" hidden>
+          <div id="${p}-preview-host" class="ocr-preview-host"></div>
         </article>
       </div>
       <form id="${p}-form" class="card form recipe-form" novalidate aria-labelledby="${p}-form-title">
@@ -96,27 +100,16 @@ export class RecipeImporter {
       this.save();
     });
 
-    // Custom drop zone: role="button" with Enter/Space keyboard activation.
-    const zone = this.el('dropzone');
-    const fileInput = this.el('file');
-    zone.addEventListener('click', () => fileInput.click());
-    zone.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        fileInput.click();
-      }
-    });
-    zone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      zone.classList.add('is-dragging');
-    });
-    zone.addEventListener('dragleave', () => zone.classList.remove('is-dragging'));
-    zone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      zone.classList.remove('is-dragging');
-      this.handleImage(e.dataTransfer.files[0]);
-    });
-    fileInput.addEventListener('change', () => this.handleImage(fileInput.files[0]));
+    // Real on-device OCR; the drop zone, sample photo, progress and cancel belong to this importer only.
+    this.ocr = new OcrController({
+      dropzone: this.el('dropzone'),
+      fileInput: this.el('file'),
+      sample: this.el('sample'),
+      cancel: this.el('ocr-cancel'),
+      progress: this.el('progress'),
+      status: this.el('status'),
+      previewHost: this.el('preview-host'),
+    }, { onText: (text) => this.applyOcrText(text), previewId: `${this.p}-preview` });
   }
 
   readForm() {
@@ -151,36 +144,16 @@ export class RecipeImporter {
     this.el('title').focus();
   }
 
-  /** Simulated OCR: deterministic sample text chosen from the file size, revealed in progress steps. */
-  handleImage(file) {
-    const status = this.el('status');
-    const progress = this.el('progress');
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      status.textContent = 'That file is not an image. Choose a JPG, PNG, WebP or HEIC photo.';
+  /** Puts OCR text in the raw box for review, then parses it into the form when headings were found. */
+  applyOcrText(text) {
+    const raw = this.el('raw');
+    raw.value = text;
+    if (!RecipeManager.parseRecipeText(text).ingredientsText) {
+      announce('Text was read, but no “Ingredients” heading was found. Edit the raw text, add the headings, then choose Parse into form.');
+      raw.focus();
       return;
     }
-    if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
-    this.previewUrl = URL.createObjectURL(file);
-    const preview = this.el('preview');
-    preview.src = this.previewUrl;
-    preview.alt = `Uploaded recipe photo: ${file.name}`;
-    preview.hidden = false;
-
-    const steps = [[20, 'Detecting text regions…'], [55, 'Recognizing characters…'], [85, 'Structuring recipe sections…'], [100, 'Done']];
-    progress.hidden = false;
-    steps.forEach(([value, label], i) => {
-      window.setTimeout(() => {
-        progress.value = value;
-        status.textContent = `${label} ${value}%`;
-        if (value === 100) {
-          this.el('raw').value = OCR_SAMPLES[file.size % OCR_SAMPLES.length];
-          progress.hidden = true;
-          status.textContent = 'Text extracted (simulated). The details form has been pre-filled for review.';
-          this.parseRaw();
-        }
-      }, (i + 1) * 400);
-    });
+    this.parseRaw();
   }
 
   renderAnalysis(recipe) {
