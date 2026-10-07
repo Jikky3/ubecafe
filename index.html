@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ube Café Nutrition Planner: Meal Plans, Macro Targets & Grocery Lists</title>
+  <meta name="description" content="Free, private meal planner that calculates calorie and macro targets with the Mifflin-St Jeor formula, tracks 11 micronutrients, explains which foods to eat and why, times your supplements, and builds a Sunday grocery list.">
+  <meta name="keywords" content="meal planner, nutrition calculator, macro calculator, Mifflin-St Jeor, micronutrients, RDA, recipe nutrition analyzer, supplement timing, grocery list generator, weekly meal plan">
+  <meta name="author" content="Ube Café">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#f4efe4" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1c15" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <link rel="canonical" href="https://julianaviado.github.io/ubecafe/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Ube Café">
+  <meta property="og:title" content="Ube Café Nutrition Planner">
+  <meta property="og:description" content="Plan a week of meals, hit your macro and micronutrient targets, and shop from an auto-built Sunday grocery list.">
+  <meta property="og:url" content="https://julianaviado.github.io/ubecafe/">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Ube Café Nutrition Planner">
+  <meta name="twitter:description" content="Rule-based meal planning: macro targets, micronutrient dashboard, food recommendations with reasons, supplement timing and grocery lists.">
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 26C6 12 16 4 28 4c0 12-8 22-22 22z' fill='%234a5a32'/%3E%3Cpath d='M6 26 22 10' stroke='%23f4efe4' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="styles.css">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebApplication",
+        "@id": "https://julianaviado.github.io/ubecafe/#app",
+        "name": "Ube Café Nutrition Planner",
+        "url": "https://julianaviado.github.io/ubecafe/",
+        "description": "A deterministic, rule-based meal planning and nutrition web application. It calculates calorie and macronutrient targets using the Mifflin-St Jeor equation, tracks Recommended Dietary Allowances for 11 micronutrients, parses recipes, recommends foods with explicit reasons, schedules supplements and generates a weekly grocery list.",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "Any (web browser)",
+        "browserRequirements": "Requires JavaScript (ES2022).",
+        "inLanguage": "en",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "accessibilityFeature": ["highContrastDisplay", "displayTransformability", "structuralNavigation", "readingOrder"],
+        "accessibilityHazard": "none",
+        "accessMode": ["textual", "visual"],
+        "featureList": [
+          "Mifflin-St Jeor calorie target calculator",
+          "Protein, carbohydrate, fat and sugar targets by goal",
+          "RDA targets for vitamin A, C, D, B12, calcium, iron, potassium, magnesium, zinc, fiber and omega-3",
+          "Daily macro and micronutrient progress dashboard with deficiency badges",
+          "Recipe text importer and simulated photo OCR",
+          "Ingredient parser with embedded nutrition dictionary",
+          "Rule-based food recommendations with reasons",
+          "Meal timeline and supplement timing optimizer",
+          "Weekly grocery list grouped by store aisle"
+        ]
+      },
+      {
+        "@type": "Recipe",
+        "@id": "https://julianaviado.github.io/ubecafe/#lentil-spinach-soup",
+        "name": "Lentil & Spinach Soup",
+        "description": "Sample recipe from the planner's built-in library: an iron- and fiber-rich red lentil soup.",
+        "recipeYield": "4 servings",
+        "recipeCategory": "Lunch",
+        "recipeIngredient": ["1 cup red lentils", "4 cups vegetable broth", "1 onion, chopped", "2 carrots, diced", "3 cloves garlic", "3 cups spinach", "1 can diced tomatoes", "1 tsp cumin", "1 tbsp olive oil", "1/2 tsp salt"],
+        "recipeInstructions": [
+          { "@type": "HowToStep", "text": "Soften onion, carrot and garlic in oil." },
+          { "@type": "HowToStep", "text": "Add lentils, broth, tomatoes and cumin; simmer 20 minutes." },
+          { "@type": "HowToStep", "text": "Stir in spinach and salt." }
+        ],
+        "nutrition": {
+          "@type": "NutritionInformation",
+          "servingSize": "1 of 4 servings",
+          "calories": "265 kcal",
+          "proteinContent": "14.9 g",
+          "carbohydrateContent": "43.8 g",
+          "fatContent": "4.6 g",
+          "sugarContent": "7.5 g",
+          "fiberContent": "8.3 g"
+        },
+        "isPartOf": { "@id": "https://julianaviado.github.io/ubecafe/#app" }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <!-- Decorative botanical sprite, referenced with <use>. Hidden from assistive tech. -->
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="leaf" viewBox="0 0 80 40">
+      <path d="M0 20C18-2 58-4 80 20 58 44 18 42 0 20Z"/>
+    </symbol>
+    <symbol id="branch" viewBox="0 0 320 420">
+      <path d="M8 412C60 330 96 250 150 180S260 60 312 8" fill="none" stroke-width="4" stroke-linecap="round" style="stroke:var(--branch)"/>
+      <path d="M118 222C150 214 190 230 214 262M176 150c-8-34 6-70 34-92" fill="none" stroke-width="3" stroke-linecap="round" style="stroke:var(--branch)"/>
+      <use href="#leaf" width="96" height="48" transform="translate(30 330) rotate(-60)" style="fill:var(--leaf-2)"/>
+      <use href="#leaf" width="96" height="48" transform="translate(70 360) rotate(-10)" style="fill:var(--leaf-1)"/>
+      <use href="#leaf" width="104" height="52" transform="translate(62 266) rotate(-80)" style="fill:var(--leaf-3)"/>
+      <use href="#leaf" width="104" height="52" transform="translate(112 276) rotate(-20)" style="fill:var(--leaf-2)"/>
+      <use href="#leaf" width="96" height="48" transform="translate(196 252) rotate(40)" style="fill:var(--leaf-1)"/>
+      <use href="#leaf" width="90" height="45" transform="translate(150 230) rotate(10)" style="fill:var(--leaf-3)"/>
+      <use href="#leaf" width="104" height="52" transform="translate(104 190) rotate(-95)" style="fill:var(--leaf-1)"/>
+      <use href="#leaf" width="110" height="55" transform="translate(166 178) rotate(-30)" style="fill:var(--leaf-2)"/>
+      <use href="#leaf" width="96" height="48" transform="translate(160 120) rotate(-110)" style="fill:var(--leaf-3)"/>
+      <use href="#leaf" width="96" height="48" transform="translate(200 60) rotate(-150)" style="fill:var(--leaf-2)"/>
+      <use href="#leaf" width="104" height="52" transform="translate(222 120) rotate(-40)" style="fill:var(--leaf-1)"/>
+      <use href="#leaf" width="90" height="45" transform="translate(250 64) rotate(-70)" style="fill:var(--leaf-3)"/>
+      <use href="#leaf" width="84" height="42" transform="translate(262 50) rotate(-5)" style="fill:var(--leaf-2)"/>
+      <circle cx="132" cy="246" r="7" style="fill:var(--berry)"/>
+      <circle cx="145" cy="254" r="6" style="fill:var(--berry)"/>
+      <circle cx="236" cy="96" r="6" style="fill:var(--berry)"/>
+    </symbol>
+    <symbol id="sprig" viewBox="0 0 64 64">
+      <path d="M32 60V14" fill="none" stroke-width="2.5" stroke-linecap="round" style="stroke:var(--branch)"/>
+      <use href="#leaf" width="30" height="15" transform="translate(32 44) rotate(-35)" style="fill:var(--leaf-1)"/>
+      <use href="#leaf" width="30" height="15" transform="translate(32 44) rotate(-145) scale(1 -1)" style="fill:var(--leaf-2)"/>
+      <use href="#leaf" width="26" height="13" transform="translate(32 28) rotate(-40)" style="fill:var(--leaf-2)"/>
+      <use href="#leaf" width="26" height="13" transform="translate(32 28) rotate(-140) scale(1 -1)" style="fill:var(--leaf-1)"/>
+      <circle cx="32" cy="12" r="5" style="fill:var(--berry)"/>
+    </symbol>
+  </svg>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="#main">
+        <svg class="brand__mark" aria-hidden="true" focusable="false"><use href="#sprig"/></svg>
+        <span class="brand__name">Ube <em>Café</em></span>
+      </a>
+      <button type="button" id="theme-toggle" class="btn btn--ghost theme-toggle" aria-pressed="false">
+        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="20" height="20"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <span>Dark mode</span>
+      </button>
+    </div>
+    <nav class="site-nav" aria-label="Primary">
+      <ul>
+        <li><a href="#profile">Profile</a></li>
+        <li><a href="#dashboard">Dashboard</a></li>
+        <li><a href="#recommendations">Food &amp; Why</a></li>
+        <li><a href="#planner">Meal Plan</a></li>
+        <li><a href="#schedule">Schedule</a></li>
+        <li><a href="#recipes">Recipes</a></li>
+        <li><a href="#grocery">Grocery List</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div id="app-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <main id="main" tabindex="-1">
+    <section class="hero" aria-labelledby="hero-title">
+      <svg class="botanical botanical--hero-left" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
+      <svg class="botanical botanical--hero-right" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
+      <p class="eyebrow">A slow-food planner · rule-based, private, free</p>
+      <h1 id="hero-title" class="display">
+        <span class="display__paren" aria-hidden="true">(</span>
+        Meals that <em>nourish you</em>
+        <span class="display__paren" aria-hidden="true">)</span>
+      </h1>
+      <p class="lede">Pull up a chair. Tell us a little about yourself and we'll brew your daily calorie, macro and micronutrient targets, explain which foods to reach for and why, time your supplements, and pour it all into a Sunday grocery list.</p>
+      <div class="button-row button-row--center">
+        <a class="btn btn--primary" href="#profile">Set my targets</a>
+        <a class="btn btn--secondary" href="#recipes">Import a recipe</a>
+      </div>
+      <noscript><p class="notice">This planner needs JavaScript to calculate targets and save your plan.</p></noscript>
+    </section>
+
+    <!-- 1. Profile & targets -->
+    <section id="profile" class="section" aria-labelledby="profile-title">
+      <header class="section__header">
+        <h2 id="profile-title" class="section__title">Your body, <em>your numbers</em></h2>
+        <p class="section__intro">Targets use the Mifflin-St Jeor equation and NIH Dietary Reference Intakes. Everything stays on this device.</p>
+      </header>
+
+      <div class="split">
+        <form id="profile-form" class="card form" novalidate aria-describedby="profile-required">
+          <p id="profile-required" class="form__note">All fields are required.</p>
+
+          <fieldset class="field-group">
+            <legend>Measurement units</legend>
+            <div class="segmented">
+              <input type="radio" id="units-imperial" name="units" value="imperial">
+              <label for="units-imperial">Imperial (ft, lb)</label>
+              <input type="radio" id="units-metric" name="units" value="metric">
+              <label for="units-metric">Metric (cm, kg)</label>
+            </div>
+          </fieldset>
+
+          <div class="form__grid">
+            <div class="field">
+              <label for="age">Age <span class="field__hint">(years)</span></label>
+              <input type="number" id="age" name="age" min="14" max="100" step="1" inputmode="numeric" required aria-describedby="age-error">
+              <p id="age-error" class="field-error"></p>
+            </div>
+            <div class="field">
+              <label for="gender">Gender</label>
+              <select id="gender" name="gender" aria-describedby="gender-hint">
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+                <option value="other">Prefer not to say</option>
+              </select>
+              <p id="gender-hint" class="field__hint">“Prefer not to say” averages the male and female equations.</p>
+            </div>
+          </div>
+
+          <fieldset class="field-group" data-units="imperial">
+            <legend>Height</legend>
+            <div class="form__grid">
+              <div class="field">
+                <label for="height-ft">Feet</label>
+                <input type="number" id="height-ft" name="height-ft" min="3" max="8" step="1" inputmode="numeric" required aria-describedby="height-ft-error">
+                <p id="height-ft-error" class="field-error"></p>
+              </div>
+              <div class="field">
+                <label for="height-in">Inches</label>
+                <input type="number" id="height-in" name="height-in" min="0" max="11.9" step="0.1" inputmode="decimal" required aria-describedby="height-in-error">
+                <p id="height-in-error" class="field-error"></p>
+              </div>
+            </div>
+          </fieldset>
+          <div class="field" data-units="metric" hidden>
+            <label for="height-cm">Height <span class="field__hint">(cm)</span></label>
+            <input type="number" id="height-cm" name="height-cm" min="100" max="250" step="0.1" inputmode="decimal" required aria-describedby="height-cm-error">
+            <p id="height-cm-error" class="field-error"></p>
+          </div>
+
+          <div class="field" data-units="imperial">
+            <label for="weight-lb">Weight <span class="field__hint">(lb)</span></label>
+            <input type="number" id="weight-lb" name="weight-lb" min="66" max="700" step="0.1" inputmode="decimal" required aria-describedby="weight-lb-error">
+            <p id="weight-lb-error" class="field-error"></p>
+          </div>
+          <div class="field" data-units="metric" hidden>
+            <label for="weight-kg">Weight <span class="field__hint">(kg)</span></label>
+            <input type="number" id="weight-kg" name="weight-kg" min="30" max="320" step="0.1" inputmode="decimal" required aria-describedby="weight-kg-error">
+            <p id="weight-kg-error" class="field-error"></p>
+          </div>
+
+          <div class="field">
+            <label for="activity">Activity level</label>
+            <select id="activity" name="activity">
+              <option value="sedentary">Sedentary: desk job, little exercise</option>
+              <option value="light">Lightly active: exercise 1–3 days/week</option>
+              <option value="moderate">Moderately active: exercise 3–5 days/week</option>
+              <option value="active">Very active: hard exercise 6–7 days/week</option>
+              <option value="athlete">Athlete: twice-daily or physical job</option>
+            </select>
+          </div>
+
+          <fieldset class="field-group">
+            <legend>Primary goal</legend>
+            <div class="segmented segmented--three">
+              <input type="radio" id="goal-loss" name="goal" value="loss">
+              <label for="goal-loss">Weight loss</label>
+              <input type="radio" id="goal-maintain" name="goal" value="maintain">
+              <label for="goal-maintain">Maintenance</label>
+              <input type="radio" id="goal-gain" name="goal" value="gain">
+              <label for="goal-gain">Muscle gain</label>
+            </div>
+          </fieldset>
+
+          <button type="submit" class="btn btn--primary btn--block">Calculate my targets</button>
+        </form>
+
+        <div id="targets-output" class="card targets" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- 2. Dashboard -->
+    <section id="dashboard" class="section section--sky" aria-labelledby="dashboard-title">
+      <svg class="botanical botanical--edge-right" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
+      <header class="section__header">
+        <h2 id="dashboard-title" class="section__title">Today's <em>cup of nutrients</em></h2>
+        <p class="section__intro">Intake is the sum of one serving of each meal planned for the selected day.</p>
+      </header>
+
+      <div class="toolbar card">
+        <div class="field field--inline">
+          <label for="view-day">Viewing day</label>
+          <select id="view-day"></select>
+        </div>
+        <p id="dashboard-summary" class="toolbar__summary" aria-live="polite"></p>
+      </div>
+
+      <div class="dashboard-grid">
+        <article class="card" aria-labelledby="macro-title">
+          <h3 id="macro-title">Macronutrients</h3>
+          <ul id="macro-list" class="nutrient-list"></ul>
+        </article>
+        <article class="card" aria-labelledby="micro-title">
+          <h3 id="micro-title">Micronutrients</h3>
+          <ul id="micro-list" class="nutrient-list"></ul>
+        </article>
+      </div>
+      <p class="legend-note">
+        <span class="badge badge--ok"><span aria-hidden="true">✓</span> Met</span> 80% or more ·
+        <span class="badge badge--warn"><span aria-hidden="true">!</span> Low</span> 50–79% ·
+        <span class="badge badge--danger"><span aria-hidden="true">✕</span> Deficient</span> under 50% of the RDA.
+      </p>
+    </section>
+
+    <!-- 3. Recommendations -->
+    <section id="recommendations" class="section" aria-labelledby="recs-title">
+      <header class="section__header">
+        <svg class="sprig" aria-hidden="true" focusable="false"><use href="#sprig"/></svg>
+        <h2 id="recs-title" class="section__title">Which food, <em>and why</em></h2>
+        <p class="section__intro">Plain if/else rules compare <span data-day-label></span>'s totals against your targets. No guesswork, no AI.</p>
+      </header>
+      <ul id="recommendation-list" class="card-grid" aria-live="polite"></ul>
+    </section>
+
+    <!-- 4. Weekly planner -->
+    <section id="planner" class="section section--sky" aria-labelledby="planner-title">
+      <svg class="botanical botanical--edge-left" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
+      <header class="section__header">
+        <h2 id="planner-title" class="section__title">The week <em>on the menu</em></h2>
+        <p class="section__intro">Choose a recipe for each meal. Changes save automatically and update your dashboard and grocery list.</p>
+      </header>
+      <div id="planner-grid" class="planner-grid"></div>
+      <div class="button-row button-row--center">
+        <button type="button" id="clear-week" class="btn btn--secondary">Clear week</button>
+      </div>
+    </section>
+
+    <!-- 5. Schedule & supplements -->
+    <section id="schedule" class="section" aria-labelledby="schedule-title">
+      <header class="section__header">
+        <h2 id="schedule-title" class="section__title">A gentle rhythm <em>for the day</em></h2>
+        <p class="section__intro">Timeline for <span data-day-label></span>. Supplements are placed by absorption rules: fat-soluble with your fattiest meal, iron with vitamin C and away from calcium and coffee, magnesium in the evening.</p>
+      </header>
+      <div class="split split--schedule">
+        <form id="supplement-form" class="card form" aria-labelledby="supplement-legend">
+          <fieldset class="field-group">
+            <legend id="supplement-legend">Supplements you take</legend>
+            <div id="supplement-options" class="check-grid"></div>
+          </fieldset>
+          <fieldset class="field-group">
+            <legend>Habits</legend>
+            <div class="check">
+              <input type="checkbox" id="coffee-breakfast" name="coffee">
+              <label for="coffee-breakfast">I drink coffee or tea with breakfast</label>
+            </div>
+          </fieldset>
+        </form>
+        <ol id="timeline" class="timeline"></ol>
+      </div>
+    </section>
+
+    <!-- 6. Recipe importer -->
+    <section id="recipes" class="section section--sky" aria-labelledby="recipes-title">
+      <svg class="botanical botanical--edge-right" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
+      <header class="section__header">
+        <h2 id="recipes-title" class="section__title">Bring your <em>recipes home</em></h2>
+        <p class="section__intro">Paste a recipe or scan a photo. Ingredients are matched against a built-in nutrition dictionary of 50+ foods.</p>
+      </header>
+
+      <div class="import-grid">
+        <article class="card" aria-labelledby="paste-title">
+          <h3 id="paste-title">Paste recipe text</h3>
+          <div class="field">
+            <label for="raw-recipe">Raw recipe</label>
+            <textarea id="raw-recipe" rows="9" aria-describedby="raw-hint" placeholder="Title: Morning Oats&#10;Servings: 2&#10;Ingredients:&#10;- 1 cup rolled oats&#10;- 2 cups milk&#10;Instructions:&#10;1. Simmer for 5 minutes."></textarea>
+            <p id="raw-hint" class="field__hint">Include “Ingredients” and “Instructions” headings. Title and servings lines are optional.</p>
+          </div>
+          <button type="button" id="parse-raw" class="btn btn--secondary">Parse into form</button>
+        </article>
+
+        <article class="card" aria-labelledby="ocr-title">
+          <h3 id="ocr-title">Scan a recipe photo</h3>
+          <div id="ocr-dropzone" class="dropzone" role="button" tabindex="0" aria-describedby="ocr-hint">
+            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="32" height="32"><path d="M4 7h3l2-3h6l2 3h3v13H4z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            <span class="dropzone__title">Choose or drop a photo</span>
+          </div>
+          <p id="ocr-hint" class="field__hint">Simulated OCR for demonstration: your image never leaves this device, and a sample recipe text is extracted.</p>
+          <input type="file" id="ocr-file" accept="image/*" hidden>
+          <label for="ocr-progress" class="sr-only">Text extraction progress</label>
+          <progress id="ocr-progress" max="100" value="0" hidden></progress>
+          <p id="ocr-status" class="ocr-status" role="status" aria-live="polite"></p>
+          <img id="ocr-preview" class="ocr-preview" alt="" hidden>
+        </article>
+      </div>
+
+      <form id="recipe-form" class="card form recipe-form" novalidate aria-labelledby="recipe-form-title">
+        <h3 id="recipe-form-title">Recipe details</h3>
+        <div class="form__grid form__grid--title">
+          <div class="field">
+            <label for="recipe-title">Title</label>
+            <input type="text" id="recipe-title" name="recipe-title" autocomplete="off" required aria-describedby="recipe-title-error">
+            <p id="recipe-title-error" class="field-error"></p>
+          </div>
+          <div class="field">
+            <label for="recipe-servings">Servings</label>
+            <input type="number" id="recipe-servings" name="recipe-servings" min="1" max="50" step="1" value="1" inputmode="numeric" required aria-describedby="recipe-servings-error">
+            <p id="recipe-servings-error" class="field-error"></p>
+          </div>
+        </div>
+        <div class="form__grid">
+          <div class="field">
+            <label for="recipe-ingredients">Ingredients <span class="field__hint">(one per line)</span></label>
+            <textarea id="recipe-ingredients" name="recipe-ingredients" rows="8" required aria-describedby="recipe-ingredients-hint recipe-ingredients-error"></textarea>
+            <p id="recipe-ingredients-hint" class="field__hint">Examples: “1 1/2 cups rolled oats”, “200 g spinach”, “2 large eggs”.</p>
+            <p id="recipe-ingredients-error" class="field-error"></p>
+          </div>
+          <div class="field">
+            <label for="recipe-instructions">Instructions <span class="field__hint">(optional)</span></label>
+            <textarea id="recipe-instructions" name="recipe-instructions" rows="8"></textarea>
+          </div>
+        </div>
+        <div class="button-row">
+          <button type="button" id="analyze-recipe" class="btn btn--secondary">Analyze nutrition</button>
+          <button type="submit" id="save-recipe" class="btn btn--primary">Save recipe</button>
+          <button type="button" id="cancel-edit" class="btn btn--ghost" hidden>Cancel edit</button>
+        </div>
+        <div id="analysis-output" class="analysis" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <!-- 7. Recipe library -->
+    <section id="library" class="section" aria-labelledby="library-heading">
+      <header class="section__header">
+        <h2 id="library-heading" class="section__title" tabindex="-1">The recipe <em>library</em> <span class="count-pill">(<span id="recipe-count">0</span>)</span></h2>
+        <p class="section__intro">Nutrition shown per serving. Edit a recipe to re-analyze it.</p>
+      </header>
+      <ul id="recipe-library" class="card-grid"></ul>
+    </section>
+
+    <!-- 8. Grocery list -->
+    <section id="grocery" class="section section--sky" aria-labelledby="grocery-title">
+      <svg class="botanical botanical--edge-left" aria-hidden="true" focusable="false"><use href="#branch"/></svg>
+      <header class="section__header">
+        <h2 id="grocery-title" class="section__title">Sunday <em>market list</em></h2>
+        <p class="section__intro">Every ingredient from Monday to Sunday, merged, summed and sorted by aisle. <span id="shopping-day"></span></p>
+      </header>
+      <div class="toolbar card">
+        <div class="field field--inline">
+          <label for="household-size">People to shop for</label>
+          <input type="number" id="household-size" min="1" max="12" step="1" inputmode="numeric">
+        </div>
+        <p id="grocery-progress" class="toolbar__summary" role="status" aria-live="polite"></p>
+        <button type="button" id="uncheck-all" class="btn btn--ghost">Uncheck all</button>
+      </div>
+      <div id="grocery-list" class="grocery-grid"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <p class="brand brand--footer"><svg class="brand__mark" aria-hidden="true" focusable="false"><use href="#sprig"/></svg><span class="brand__name">Ube <em>Café</em></span></p>
+        <p>Warm, dependable meal planning, brewed from transparent rules.</p>
+      </div>
+      <p class="site-footer__disclaimer">Educational tool only. Not medical advice. Consult a registered dietitian or physician before changing your diet or starting supplements, especially if pregnant, nursing or managing a health condition.</p>
+    </div>
+    <p class="site-footer__copy">© <span id="year">2026</span> Ube Café. Nutrient data adapted from USDA FoodData Central.</p>
+  </footer>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
