@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ube Café Nutrition Planner: Meal Plans, Macro Targets & Grocery Lists</title>
+  <!-- [html-validate-disable-next long-title -- 69 characters as rendered; the rule counts "&amp;amp;" as five] -->
+  <title>Ube Café Nutrition Planner: Meal Plans, Macro Targets &amp; Grocery Lists</title>
   <meta name="description" content="Free, private meal planner that calculates calorie and macro targets with the Mifflin-St Jeor formula, tracks 11 micronutrients, explains which foods to eat and why, times your supplements, and builds a Sunday grocery list.">
   <meta name="keywords" content="meal planner, nutrition calculator, macro calculator, Mifflin-St Jeor, micronutrients, RDA, recipe nutrition analyzer, supplement timing, grocery list generator, weekly meal plan">
   <meta name="author" content="Ube Café">
@@ -407,6 +408,7 @@
         <p class="section__intro">Timeline for <span data-day-label></span>. Supplements are placed by absorption rules: fat-soluble with your fattiest meal, iron with vitamin C and away from calcium and coffee, magnesium in the evening.</p>
       </header>
       <div class="split split--schedule">
+        <!-- [html-validate-disable-next wcag/h32 -- choices apply instantly on change; there is nothing to submit] -->
         <form id="supplement-form" class="card form" aria-labelledby="supplement-legend">
           <fieldset class="field-group">
             <legend id="supplement-legend">Supplements you take</legend>
@@ -445,6 +447,7 @@
 
         <article class="card" aria-labelledby="ocr-title">
           <h3 id="ocr-title">Scan a recipe photo</h3>
+          <!-- [html-validate-disable-next prefer-native-element -- also a drag-and-drop target; keyboard activation is handled in js/ui/recipes.js] -->
           <div id="ocr-dropzone" class="dropzone" role="button" tabindex="0" aria-describedby="ocr-hint">
             <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="32" height="32"><path d="M4 7h3l2-3h6l2 3h3v13H4z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
             <span class="dropzone__title">Choose or drop a photo</span>
@@ -454,6 +457,7 @@
           <label for="ocr-progress" class="sr-only">Text extraction progress</label>
           <progress id="ocr-progress" max="100" value="0" hidden></progress>
           <p id="ocr-status" class="ocr-status" role="status" aria-live="polite"></p>
+          <!-- [html-validate-disable-next element-required-attributes -- src is set from the chosen photo at runtime; hidden until then] -->
           <img id="ocr-preview" class="ocr-preview" alt="" hidden>
         </article>
       </div>
