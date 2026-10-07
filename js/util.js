@@ -1,7 +1,7 @@
-import { NUTRIENT_KEYS } from './data/nutrients.js';
 import { DAYS } from './data/constants.js';
+import { NUTRIENT_KEYS } from './data/nutrients.js';
 
-/** Shared helpers. */
+
 export const $ = (selector, root = document) => root.querySelector(selector);
 
 export const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (ch) => ({
@@ -16,7 +16,9 @@ export const fmt = (value) => {
 };
 
 export const emptyNutrients = () => Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, 0]));
+
 export const addNutrients = (a, b) => Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, a[k] + b[k]]));
+
 export const scaleNutrients = (n, factor) => Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, n[k] * factor]));
 
 export const createId = () => `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -29,3 +31,7 @@ export const announce = (message) => {
   region.textContent = '';
   window.setTimeout(() => { region.textContent = message; }, 50);
 };
+
+export const round1 = (n) => Math.round(n * 10) / 10;
+
+export const KG_PER_LB = 0.45359237;

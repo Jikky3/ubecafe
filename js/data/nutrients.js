@@ -1,4 +1,4 @@
-/** Tracked nutrients and grocery aisles. */
+
 export const NUTRIENTS = [
   { key: 'calories', label: 'Calories', unit: 'kcal', group: 'macro' },
   { key: 'protein', label: 'Protein', unit: 'g', group: 'macro' },
@@ -17,8 +17,11 @@ export const NUTRIENTS = [
   { key: 'zinc', label: 'Zinc', unit: 'mg', group: 'micro' },
   { key: 'omega3', label: 'Omega-3', unit: 'g', group: 'micro' },
 ];
+
 export const NUTRIENT_KEYS = NUTRIENTS.map((n) => n.key);
+
 export const NUTRIENT_BY_KEY = Object.fromEntries(NUTRIENTS.map((n) => [n.key, n]));
 
 export const AISLES = ['Produce', 'Meat & Seafood', 'Dairy', 'Pantry & Grains', 'Supplements & Spices'];
+
 export const [PRODUCE, MEAT, DAIRY, PANTRY, SPICES] = AISLES;

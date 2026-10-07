@@ -1,7 +1,7 @@
 import { MEAL_SLOTS, SLOT_BY_ID, SUPPLEMENT_BY_ID } from '../data/constants.js';
 import { fmt } from '../util.js';
 
-/** Meal timeline and supplement timing rules. */
+
 export class ScheduleOptimizer {
   /**
    * @param {Object<string, {recipe, nutrients}|null>} meals – keyed by slot id

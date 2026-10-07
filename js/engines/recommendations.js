@@ -1,8 +1,40 @@
 import { NUTRIENT_BY_KEY } from '../data/nutrients.js';
 
-/** Explicit if/else "which food & why" rules. */
+
 export class RecommendationEngine {
-  static recommend(intake, targets, mealsPlanned) {
+  /** Restriction tags for foods named in recommendations (unlisted foods are unrestricted). */
+  static FOOD_RESTRICTIONS = {
+    'Oats with Nut Butter': ['grains', 'gluten', 'peanuts', 'tree_nuts', 'legumes'],
+    'Greek Yogurt': ['dairy'],
+    'Cottage Cheese': ['dairy'],
+    'Plain Yogurt': ['dairy'],
+    'Fortified Milk': ['dairy'],
+    'Fortified Oat Milk': ['grains'],
+    'Fortified Soy Milk': ['soy', 'legumes'],
+    Eggs: ['eggs'],
+    'Firm Tofu': ['soy', 'legumes'],
+    Almonds: ['tree_nuts'],
+    Walnuts: ['tree_nuts'],
+    'Chicken Breast': ['meat'],
+    'Lean Beef': ['meat'],
+    Salmon: ['fish'],
+    Sardines: ['fish'],
+    'Canned Tuna': ['fish'],
+    Lentils: ['legumes'],
+    'Black Beans': ['legumes'],
+    Chickpeas: ['legumes'],
+    Banana: ['high_carb_fruit'],
+    'Sweet Potato': ['starch'],
+  };
+
+  /** Removes foods that clash with active restrictions; returns the safe names and the ones left out. */
+  static safeFoods(foodList, restrictions) {
+    const names = foodList.split(' / ');
+    const isSafe = (name) => !(this.FOOD_RESTRICTIONS[name] ?? []).some((t) => restrictions.includes(t));
+    return { safe: names.filter(isSafe), removed: names.filter((n) => !isSafe(n)) };
+  }
+
+  static recommend(intake, targets, mealsPlanned, restrictions = []) {
     if (mealsPlanned === 0) {
       return [{
         food: 'Plan your first meal',
@@ -14,12 +46,16 @@ export class RecommendationEngine {
 
     const recs = [];
     const ratio = (key) => (targets[key] > 0 ? intake[key] / targets[key] : 1);
-    const add = (key, food, reason) => {
+    /** Adds a rule's output, swapping in `alternative` foods when every option clashes with a restriction. */
+    const add = (key, foods, reason, alternative) => {
+      let { safe, removed } = this.safeFoods(foods, restrictions);
+      if (!safe.length && alternative) safe = this.safeFoods(alternative, restrictions).safe;
+      if (!safe.length) return;
       const r = ratio(key);
       recs.push({
-        key,
-        food,
+        food: safe.join(' / '),
         reason,
+        restrictionNote: removed.length ? `Adjusted for your diet and allergies: left out ${removed.join(', ')}.` : '',
         trigger: `${NUTRIENT_BY_KEY[key].label} at ${Math.round(r * 100)}% of ${NUTRIENT_BY_KEY[key].isLimit ? 'your daily limit' : 'target'}`,
         priority: r < 0.5 || r > 1.25 ? 'high' : 'medium',
       });
@@ -34,9 +70,9 @@ export class RecommendationEngine {
 
     // Protein, with carb context
     if (ratio('protein') < 0.8 && intake.carbs >= targets.carbs) {
-      add('protein', 'Greek Yogurt / Cottage Cheese', 'High-protein, low-carb boost to meet muscle protein synthesis targets.');
+      add('protein', 'Greek Yogurt / Cottage Cheese', 'High-protein, low-carb boost to meet muscle protein synthesis targets.', 'Hemp Seeds / Canned Tuna');
     } else if (ratio('protein') < 0.8) {
-      add('protein', 'Chicken Breast / Eggs / Firm Tofu', 'Complete protein sources that close your protein deficit while leaving room for the carbohydrates you still need.');
+      add('protein', 'Chicken Breast / Eggs / Firm Tofu', 'Complete protein sources that close your protein deficit while leaving room for the carbohydrates you still need.', 'Lentils / Hemp Seeds');
     }
 
     // Limits
@@ -58,10 +94,10 @@ export class RecommendationEngine {
       add('vitaminC', 'Red Bell Pepper / Kiwi / Strawberries', 'Vitamin C supports immunity and multiplies non-heme iron absorption when eaten in the same meal.');
     }
     if (ratio('vitaminD') < 0.7) {
-      add('vitaminD', 'Salmon / Sardines / Fortified Milk', 'Few foods contain vitamin D; oily fish and fortified dairy are the most reliable dietary sources.');
+      add('vitaminD', 'Salmon / Sardines / Fortified Milk', 'Few foods contain vitamin D; oily fish and fortified dairy are the most reliable dietary sources.', 'Fortified Oat Milk / UV-Exposed Mushrooms');
     }
     if (ratio('vitaminB12') < 0.7) {
-      add('vitaminB12', 'Eggs / Salmon / Greek Yogurt', 'B12 is found almost only in animal foods and is essential for nerve function and red blood cells.');
+      add('vitaminB12', 'Eggs / Salmon / Greek Yogurt', 'B12 is found almost only in animal foods and fortified products, and is essential for nerve function and red blood cells.', 'Nutritional Yeast / Fortified Soy Milk');
     }
     if (ratio('calcium') < 0.7) {
       add('calcium', 'Greek Yogurt / Kale / Firm Tofu', 'Calcium-rich foods protect bone density; calcium-set tofu and kale are strong dairy-free options.');

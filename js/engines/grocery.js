@@ -1,23 +1,31 @@
-import { AISLES, PANTRY, SPICES } from '../data/nutrients.js';
-import { FOOD_DB } from '../data/foods.js';
 import { DAYS, MEAL_SLOTS, SUPPLEMENT_BY_ID } from '../data/constants.js';
+import { FOOD_DB } from '../data/foods.js';
+import { AISLES, PANTRY, SPICES } from '../data/nutrients.js';
+import { recipesById } from '../state.js';
 import { fmt } from '../util.js';
-import { RecipeParser } from './recipe-parser.js';
 
-/** Weekly ingredient roll-up grouped by aisle. */
+
 export class GroceryAggregator {
-  static aggregate(plan, recipesById, household, supplementIds) {
+  /**
+   * @param {(recipe) => {isSafe: boolean, ingredients: Array}} analyze – restriction-aware analyzer;
+   *   unsafe recipes are skipped and substituted ingredients are bought instead of the originals.
+   */
+  static aggregate(plan, recipesById, household, supplementIds, analyze) {
     const items = new Map();
 
     DAYS.forEach((day) => MEAL_SLOTS.forEach((slot) => {
       const recipe = recipesById.get(plan[day]?.[slot.id]);
       if (!recipe) return;
+      const analysis = analyze(recipe);
+      if (!analysis.isSafe) return;
       const factor = household / Math.max(1, recipe.servings);
-      RecipeParser.analyze(recipe).ingredients.forEach((ing) => {
+      analysis.ingredients.forEach((ing) => {
+        if (ing.omitted) return;
         if (ing.foodId) {
           const food = FOOD_DB[ing.foodId];
-          const entry = items.get(food.id) ?? { key: food.id, name: food.name, aisle: food.aisle, grams: 0, food };
+          const entry = items.get(food.id) ?? { key: food.id, name: food.name, aisle: food.aisle, grams: 0, food, replaces: new Set() };
           entry.grams += ing.grams * factor;
+          if (ing.swappedFrom) entry.replaces.add(ing.swappedFrom.toLowerCase());
           items.set(food.id, entry);
         } else {
           const key = `x:${ing.name.toLowerCase().replace(/[^a-z]+/g, '-')}:${ing.unit ?? 'unit'}`;

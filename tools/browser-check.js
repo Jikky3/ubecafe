@@ -1,8 +1,9 @@
-// Loads the app in headless Chromium and fails on any console error, uncaught exception,
+// Signs up, completes onboarding and visits every tab in headless Chromium; fails on any console error, uncaught exception,
 // missing rendered section, or serious/critical WCAG 2.1 A/AA violation reported by axe-core.
 // Uses CHROMIUM_PATH when set (e.g. a preinstalled browser), otherwise Playwright's default.
 import { createRequire } from 'node:module';
 import { chromium } from 'playwright-core';
+import { openTab, signUpAndOnboard } from './flows.js';
 import { server } from './serve.js';
 
 const require = createRequire(import.meta.url);
@@ -36,6 +37,12 @@ for (const colorScheme of ['light', 'dark']) {
   page.on('pageerror', (e) => errors.push(`pageerror (${colorScheme}): ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`console (${colorScheme}): ${m.text()}`); });
   await page.goto(url, { waitUntil: 'networkidle' });
+  const label = (where) => `${colorScheme} theme, ${where}`;
+
+  errors.push(...await runAxe(page, label('sign in')));
+  await signUpAndOnboard(page, {
+    onStep: async (step) => { errors.push(...await runAxe(page, label(`onboarding step ${step}`))); },
+  });
 
   if (colorScheme === 'light') {
     Object.assign(checks, {
@@ -45,7 +52,10 @@ for (const colorScheme of ['light', 'dark']) {
       'grocery rendered': await page.locator('#grocery-list .aisle').count() > 0,
     });
   }
-  errors.push(...await runAxe(page, `${colorScheme} theme`));
+  for (const tab of ['tab-dashboard', 'tab-recipes', 'tab-planner', 'tab-grocery']) {
+    await openTab(page, tab);
+    errors.push(...await runAxe(page, label(tab)));
+  }
   await page.close();
 }
 
@@ -58,4 +68,4 @@ if (problems.length) {
   console.error(problems.join('\n'));
   process.exit(1);
 }
-console.log(`Browser check passed (${Object.keys(checks).length} render checks, axe WCAG 2.1 A/AA in light and dark themes, no console errors).`);
+console.log(`Browser check passed (${Object.keys(checks).length} render checks, axe WCAG 2.1 A/AA on sign-in, every onboarding step and every tab, in light and dark themes, no console errors).`);

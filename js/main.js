@@ -1,61 +1,133 @@
-import { $ } from './util.js';
-import { loadUserData, state } from './state.js';
+import { DIETS } from './data/restrictions.js';
+import { AuthManager } from './engines/auth.js';
+import { NutritionEngine } from './engines/nutrition.js';
+import { currentTargets, firstName, loadUserData, state } from './state.js';
 import { Storage } from './storage.js';
-import { AccountUI } from './ui/account.js';
-import { BackupUI } from './ui/backup.js';
-import { DashboardUI } from './ui/dashboard.js';
+import { AuthView } from './ui/auth-view.js';
+import { DashboardUI, TargetsUI } from './ui/dashboard.js';
 import { GroceryUI } from './ui/grocery.js';
+import { RecipeLibrary } from './ui/library.js';
+import { OnboardingWizard } from './ui/onboarding.js';
 import { PlannerUI } from './ui/planner.js';
-import { ProfileUI } from './ui/profile.js';
-import { RecipeView } from './ui/recipe-view.js';
-import { RecipeUI } from './ui/recipes.js';
+import { ProfileDrawer } from './ui/profile-drawer.js';
+import { RecipeImporter } from './ui/recipe-importer.js';
 import { RecommendationsUI } from './ui/recommendations.js';
 import { ScheduleUI } from './ui/schedule.js';
+import { Tabs } from './ui/tabs.js';
 import { ThemeUI } from './ui/theme.js';
+import { $, announce, fmt } from './util.js';
+
 
 export const App = {
-  /** Runs after `await Storage.init()`, so every Storage.load below is served from the filled cache. */
-  init() {
-    Object.assign(state, loadUserData());
-    ThemeUI.init();
-    AccountUI.init();
-    BackupUI.init();
-    ProfileUI.init();
-    DashboardUI.init();
-    ScheduleUI.init();
-    RecipeUI.init();
-    PlannerUI.init();
-    GroceryUI.init();
-    RecipeView.init();
-    $('#year').textContent = String(new Date().getFullYear());
-    this.renderRecipesChanged();
-    RecipeView.openFromHash();
+  importer: null,
+  tabs: null,
+  VIEWS: {
+    auth: { el: '#auth-view', heading: '#auth-title', title: 'Ube Café Nutrition Planner: Meal Plans, Macro Targets & Grocery Lists' },
+    onboarding: { el: '#onboarding-view', heading: '#wizard-title', title: 'Set up your profile · Ube Café' },
+    app: { el: '#app-view', heading: '#app-title', title: 'Your meal plan · Ube Café' },
   },
 
-  /** Swaps in the active scope's data (after sign-in / sign-out) and refreshes every view. */
-  reloadUserData() {
-    Object.assign(state, loadUserData(), { editingId: null });
-    RecipeUI.resetForm();
-    ProfileUI.fill(state.profile);
+  init() {
+    ThemeUI.init();
+    AuthView.init();
+    OnboardingWizard.init();
+    ProfileDrawer.init();
+    DashboardUI.init();
+    RecipeLibrary.init();
+    PlannerUI.init();
+    ScheduleUI.init();
+    GroceryUI.init();
+    this.importer = new RecipeImporter($('#library-importer'), {
+      prefix: 'lib',
+      onSaved: (recipe, isUpdate) => {
+        this.renderAll();
+        announce(`${isUpdate ? 'Updated' : 'Saved'} “${recipe.title}”. It is now available in the weekly planner.`);
+      },
+    });
+    this.tabs = new Tabs($('#app-tablist'), {
+      onChange: (id) => {
+        state.ui = { ...state.ui, tab: id };
+        if (state.account) Storage.save(Storage.KEYS.ui, state.ui);
+      },
+    });
+    $('#year').textContent = String(new Date().getFullYear());
+
+    const email = AuthManager.restoreSession();
+    if (email) this.enter(email, { focus: false });
+    else this.showView('auth', { focus: false });
+  },
+
+  /** Loads a signed-in account and routes to onboarding or the dashboard. */
+  enter(email, { focus = true } = {}) {
+    Storage.scope = email;
+    state.account = { email, ...AuthManager.account(email) };
+    Object.assign(state, loadUserData());
+    if (!Storage.load(Storage.KEYS.recipes, null)) {
+      // First sign-in: persist the sample library and plan for this account.
+      Storage.save(Storage.KEYS.recipes, state.recipes);
+      Storage.save(Storage.KEYS.plan, state.plan);
+    }
+    if (state.profile.onboarded) this.showApp({ focus });
+    else OnboardingWizard.start('onboarding');
+  },
+
+  showView(name, { focus = true } = {}) {
+    Object.entries(this.VIEWS).forEach(([key, view]) => { $(view.el).hidden = key !== name; });
+    $('#profile-button').hidden = name !== 'app';
+    document.title = this.VIEWS[name].title;
+    window.scrollTo(0, 0);
+    if (focus) $(this.VIEWS[name].heading).focus();
+  },
+
+  showApp({ focus = true } = {}) {
     ScheduleUI.syncForm();
     GroceryUI.syncForm();
-    this.renderRecipesChanged();
+    this.importer.reset();
+    $('#app-name').textContent = firstName();
+    this.renderAll();
+    this.showView('app', { focus });
+    this.tabs.select(state.ui.tab);
   },
 
-  /** Re-renders everything derived from profile targets and the viewed day. */
-  renderNutrition() {
-    ProfileUI.renderTargets();
-    const day = DashboardUI.render();
-    RecommendationsUI.render(day);
-    ScheduleUI.render(day.meals);
+  setViewDay(day) {
+    state.viewDay = day;
+    document.querySelectorAll('[data-day-select]').forEach((select) => { select.value = day; });
+    this.renderNutrition();
   },
 
-  /** Re-renders views that list recipes, then everything downstream. */
-  renderRecipesChanged() {
-    RecipeUI.renderLibrary();
+  /** Re-renders every recipe-dependent view. */
+  renderAll() {
+    RecipeLibrary.render();
     PlannerUI.render();
     this.renderNutrition();
     GroceryUI.render();
+  },
+
+  /** Re-renders everything derived from targets and the viewed day. */
+  renderNutrition() {
+    document.querySelectorAll('[data-day-select]').forEach((select) => { select.value = state.viewDay; });
+    TargetsUI.render();
+    const day = DashboardUI.render();
+    RecommendationsUI.render(day);
+    ScheduleUI.render(day.meals);
+    ProfileDrawer.renderButton();
+    const { profile } = state;
+    $('#app-summary').textContent = `${NutritionEngine.GOALS[profile.goal].label} · ${DIETS[profile.diet].label} · ${fmt(currentTargets().targets.calories)} kcal a day`;
+  },
+
+  signOut(message) {
+    const dialog = $('#profile-drawer');
+    if (dialog.open) dialog.close();
+    const name = state.account ? firstName() : '';
+    AuthManager.signOut();
+    Storage.scope = null;
+    state.account = null;
+    // Clear the previous user's rendered data from the hidden app view.
+    ['#macro-list', '#micro-list', '#recommendation-list', '#targets-output', '#recipe-library', '#planner-grid', '#timeline', '#grocery-list']
+      .forEach((sel) => { $(sel).innerHTML = ''; });
+    AuthView.reset();
+    this.showView('auth');
+    announce(message ?? `Signed out${name ? `. See you soon, ${name}` : ''}.`);
   },
 };
 

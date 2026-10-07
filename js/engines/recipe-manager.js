@@ -1,8 +1,8 @@
-import { NUTRIENT_KEYS } from '../data/nutrients.js';
-import { FOOD_DB, ALIAS_INDEX, UNIT_LOOKUP, WEIGHT_GRAMS, UNICODE_FRACTIONS, LIST_MARKER } from '../data/foods.js';
-import { emptyNutrients, addNutrients, scaleNutrients } from '../util.js';
+import { ALIAS_INDEX, FOOD_DB, LIST_MARKER, UNICODE_FRACTIONS, UNIT_LOOKUP, WEIGHT_GRAMS } from '../data/foods.js';
+import { addNutrients, emptyNutrients, scaleNutrients } from '../util.js';
 
-export class RecipeParser {
+
+export class RecipeManager {
   static #cache = new WeakMap();
 
   /** Converts "1 1/2", "3/4" or "2.5" into a number. */

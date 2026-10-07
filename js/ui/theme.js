@@ -1,5 +1,6 @@
-import { $, announce } from '../util.js';
 import { Storage } from '../storage.js';
+import { $, announce } from '../util.js';
+
 
 export const ThemeUI = {
   init() {

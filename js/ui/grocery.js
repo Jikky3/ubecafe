@@ -1,12 +1,12 @@
 import { GroceryAggregator } from '../engines/grocery.js';
-import { recipesById, state } from '../state.js';
+import { analyzeForUser, recipesById, state } from '../state.js';
 import { Storage } from '../storage.js';
 import { $, announce, escapeHTML } from '../util.js';
+
 
 export const GroceryUI = {
   init() {
     const household = $('#household-size');
-    this.syncForm();
     household.addEventListener('change', () => {
       const value = Math.min(12, Math.max(1, Math.round(Number(household.value) || 1)));
       household.value = value;
@@ -15,7 +15,6 @@ export const GroceryUI = {
       this.render();
       announce(`Grocery quantities updated for ${value} ${value === 1 ? 'person' : 'people'}.`);
     });
-
     $('#grocery-list').addEventListener('change', (e) => {
       const checked = new Set(state.grocery.checked);
       if (e.target.checked) checked.add(e.target.value);
@@ -24,7 +23,6 @@ export const GroceryUI = {
       Storage.save(Storage.KEYS.grocery, state.grocery);
       this.updateProgress();
     });
-
     $('#uncheck-all').addEventListener('click', () => {
       state.grocery.checked = [];
       Storage.save(Storage.KEYS.grocery, state.grocery);
@@ -41,13 +39,12 @@ export const GroceryUI = {
       : `Next shopping day: ${sunday.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.`;
   },
 
-  /** Reflects the active user's household size in the form. */
   syncForm() {
     $('#household-size').value = state.grocery.household;
   },
 
   render() {
-    const groups = GroceryAggregator.aggregate(state.plan, recipesById(), state.grocery.household, state.supplements.selected);
+    const groups = GroceryAggregator.aggregate(state.plan, recipesById(), state.grocery.household, state.supplements.selected, analyzeForUser);
     const checked = new Set(state.grocery.checked);
     const list = $('#grocery-list');
     if (!groups.length) {
@@ -58,13 +55,14 @@ export const GroceryUI = {
     list.innerHTML = groups.map((group) => `
       <fieldset class="card aisle">
         <legend>${group.aisle} <span class="aisle__count">(${group.items.length})</span></legend>
-        <ul class="aisle__items">
+        <ul>
           ${group.items.map((item) => {
             const id = `g-${item.key.replace(/[^a-z0-9-]/gi, '-')}`;
+            const swap = item.replaces?.size ? ` <span class="grocery__swap">swap for ${escapeHTML([...item.replaces].join(', '))}</span>` : '';
             return `
               <li class="check check--grocery">
                 <input type="checkbox" id="${id}" value="${escapeHTML(item.key)}" ${checked.has(item.key) ? 'checked' : ''}>
-                <label for="${id}"><span class="grocery__name">${escapeHTML(item.name)}</span> <span class="grocery__qty">${escapeHTML(item.amount)}</span></label>
+                <label for="${id}"><span class="grocery__name">${escapeHTML(item.name)}${swap}</span> <span class="grocery__qty">${escapeHTML(item.amount)}</span></label>
               </li>`;
           }).join('')}
         </ul>

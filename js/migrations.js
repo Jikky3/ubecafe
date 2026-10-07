@@ -85,6 +85,15 @@ export const MIGRATIONS = [
       return next;
     },
   },
+  {
+    version: 2,
+    description: 'Profiles from before the onboarding redesign stored biological sex as `gender`; rename it to `sex`.',
+    migrate(data) {
+      if (!isPlainObject(data.profile) || !('gender' in data.profile)) return data;
+      const { gender, ...profile } = data.profile;
+      return { ...data, profile: { ...profile, sex: profile.sex ?? gender } };
+    },
+  },
 ];
 
 /** Throws unless steps have unique, ascending, positive integer versions and a migrate function. */

@@ -1,6 +1,5 @@
 import { DAYS, MEAL_SLOTS } from './constants.js';
 
-/** Starter content shown to new users. */
 export const SEED_RECIPES = [
   {
     id: 'seed-oats', title: 'Berry Chia Overnight Oats', servings: 1,
@@ -56,8 +55,14 @@ export const SEED_PLAN = (() => {
 })();
 
 export const DEFAULT_PROFILE = {
-  units: 'imperial', age: 32, gender: 'female', heightCm: 167.64, weightKg: 68.04,
-  activity: 'moderate', goal: 'maintain', bodyFatPct: null, waistCm: null, hipCm: null, updatedAt: null,
+  units: 'imperial', age: null, sex: 'female', heightCm: null, weightKg: null,
+  activity: 'moderate', goal: 'maintain', timelineWeeks: 12, diet: 'omnivore', allergies: [],
+  bodyFatPct: null, waistCm: null, hipCm: null, leanMassKg: null,
+  onboarded: false, onboardingStep: 1, updatedAt: null,
 };
+
 export const DEFAULT_SUPPLEMENTS = { selected: ['vitaminD3', 'iron', 'magnesium'], coffeeAtBreakfast: true };
+
 export const DEFAULT_GROCERY = { household: 1, checked: [] };
+
+export const DEFAULT_UI = { tab: 'tab-dashboard' };

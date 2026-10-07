@@ -157,6 +157,7 @@ export const Storage = {
     plan: 'ubecafe.plan',
     supplements: 'ubecafe.supplements',
     grocery: 'ubecafe.grocery',
+    ui: 'ubecafe.ui',
     customFoods: 'ubecafe.customFoods',
     schemaVersion: 'ubecafe.schemaVersion',
     theme: 'ubecafe.theme',
@@ -238,14 +239,17 @@ export const Storage = {
     while (this.pending.size) await Promise.all([...this.pending]);
   },
 
+  /** Returns the stored value, or a deep copy of `fallback` so shared defaults are never mutated. */
   load(key, fallback) {
     const raw = this.cache.get(this.resolve(key));
-    if (raw === undefined || raw === null || raw === '') return fallback;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return fallback;
+    if (raw !== undefined && raw !== null && raw !== '') {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        /* Corrupt value: use the fallback. */
+      }
     }
+    return structuredClone(fallback);
   },
   save(key, value) {
     const raw = JSON.stringify(value);
