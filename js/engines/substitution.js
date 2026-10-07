@@ -1,5 +1,5 @@
-import { FOOD_DB } from '../data/foods.js';
-import { DIETS, RESTRICTIONS, RESTRICTION_PATTERNS, SUBSTITUTES } from '../data/restrictions.js';
+import { normalizeText } from '../data/foods.js';
+import { DIETS, MENTION_RESTRICTIONS, RESTRICTIONS, RESTRICTION_PATTERNS, SUBSTITUTES } from '../data/restrictions.js';
 import { RecipeManager } from './recipe-manager.js';
 import { addNutrients, emptyNutrients, scaleNutrients } from '../util.js';
 
@@ -12,17 +12,33 @@ export class SubstitutionEngine {
     return [...new Set([...profile.allergies, ...DIETS[profile.diet].excludes])];
   }
 
-  /** Restrictions an ingredient violates: dictionary tags, else keyword scan. */
+  /** Restriction ids whose fallback keywords appear in a piece of text. */
+  static scanKeywords(text) {
+    const normalized = ` ${normalizeText(text)} `;
+    return Object.keys(RESTRICTION_PATTERNS).filter((id) => RESTRICTION_PATTERNS[id].test(normalized));
+  }
+
+  /**
+   * Restrictions an ingredient violates. Built-in foods use their dictionary tags. Custom foods carry
+   * no tags, so their name and the line are scanned for keywords, as are unmatched lines.
+   */
   static detect(ingredient) {
-    if (ingredient.foodId) return FOOD_DB[ingredient.foodId].tags;
-    const name = ` ${ingredient.name.toLowerCase().replace(/[^a-z\s]/g, ' ')} `;
-    return Object.keys(RESTRICTION_PATTERNS).filter((id) => RESTRICTION_PATTERNS[id].test(name));
+    const food = ingredient.food ?? (ingredient.foodId ? RecipeManager.getFood(ingredient.foodId) : null);
+    let tags;
+    if (food && !food.custom) tags = food.tags;
+    else if (food) tags = [...this.scanKeywords(food.name), ...this.scanKeywords(ingredient.name)];
+    else tags = this.scanKeywords(ingredient.name);
+    // Allergens of a food named only as a product base ("walnut oil" matched as oil).
+    const mentioned = (ingredient.mentions ?? []).flatMap((id) => RecipeManager.getFood(id)?.tags ?? [])
+      .filter((t) => MENTION_RESTRICTIONS.includes(t));
+    return [...new Set([...tags, ...mentioned])];
   }
 
   /** A substitute free of every active restriction, preferring food-specific options. */
   static pickSubstitute(restriction, foodId, active) {
     const options = SUBSTITUTES[restriction] ?? [];
-    const isSafe = (option) => option.foodId === null || !FOOD_DB[option.foodId].tags.some((t) => active.includes(t));
+    const isSafe = (option) => option.foodId === null
+      || !(RecipeManager.getFood(option.foodId)?.tags ?? []).some((t) => active.includes(t));
     return options.find((o) => o.replaces?.includes(foodId) && isSafe(o))
       ?? options.find((o) => !o.replaces && isSafe(o))
       ?? null;
@@ -39,15 +55,20 @@ export class SubstitutionEngine {
     if (!active.length) return { ...analysis, isSafe: true, flagged: [] };
 
     const key = [...active].sort().join('|');
-    const byKey = this.#cache.get(recipe) ?? new Map();
-    this.#cache.set(recipe, byKey);
+    // A new analysis object (e.g. after custom foods change) invalidates the screened results.
+    let entry = this.#cache.get(recipe);
+    if (entry?.analysis !== analysis) {
+      entry = { analysis, byKey: new Map() };
+      this.#cache.set(recipe, entry);
+    }
+    const { byKey } = entry;
     if (byKey.has(key)) return byKey.get(key);
 
     const flagged = [];
     const ingredients = analysis.ingredients.map((ing) => {
       const hits = this.detect(ing).filter((t) => active.includes(t));
       if (!hits.length) return ing;
-      const original = ing.foodId ? FOOD_DB[ing.foodId].name : ing.name;
+      const original = ing.food?.name ?? ing.name;
       const sub = hits.map((t) => this.pickSubstitute(t, ing.foodId, active)).find(Boolean) ?? null;
       flagged.push({
         raw: ing.raw,
@@ -55,19 +76,22 @@ export class SubstitutionEngine {
         hits,
         isAllergy: hits.some((t) => profile.allergies.includes(t)),
         substitute: sub && {
-          name: sub.foodId ? FOOD_DB[sub.foodId].name : 'Omit',
+          name: sub.foodId ? RecipeManager.getFood(sub.foodId).name : 'Omit',
           ratio: sub.ratio,
           note: sub.note,
         },
       });
       if (!sub) return { ...ing, blocked: true, nutrients: emptyNutrients() };
       if (sub.foodId === null) return { ...ing, omitted: true, grams: 0, nutrients: emptyNutrients(), swappedFrom: original };
+      const food = RecipeManager.getFood(sub.foodId);
       const grams = ing.grams * sub.gramRatio;
       return {
         ...ing,
-        foodId: sub.foodId,
+        foodId: food.id,
+        food,
         grams,
-        nutrients: scaleNutrients(FOOD_DB[sub.foodId].nutrients, grams / 100),
+        // A line marked "no nutrition" stays at zero; otherwise every nutrient comes from the substitute.
+        nutrients: ing.matchSource === 'ignored' ? emptyNutrients() : scaleNutrients(food.nutrients, grams / 100),
         swappedFrom: original,
       };
     });
@@ -78,6 +102,7 @@ export class SubstitutionEngine {
       totals,
       perServing: scaleNutrients(totals, 1 / Math.max(1, Number(recipe.servings) || 1)),
       unmatched: analysis.unmatched,
+      unmatchedLines: analysis.unmatchedLines,
       isSafe: flagged.every((f) => f.substitute),
       flagged,
     };

@@ -40,6 +40,9 @@ describe('NutritionEngine.calculate', () => {
     assert.equal(targets.carbs, 286); // remainder / 4
     assert.equal(targets.sugar, 55); // 10 % of energy / 4
     assert.equal(targets.fiber, 31); // 14 g per 1,000 kcal
+    assert.equal(targets.saturatedFat, 24); // 10 % of energy / 9
+    assert.equal(targets.sodium, NutritionEngine.SODIUM_LIMIT_MG);
+    assert.equal(targets.sodium, 2300);
   });
 
   it('applies the activity factor to BMR', () => {
