@@ -41,7 +41,7 @@ export class AccountManager {
    * @throws {Error} message 'unsupported' | 'wrong-password'
    */
   static async signInOrCreate(rawEmail, password) {
-    if (!window.crypto?.subtle) throw new Error('unsupported');
+    if (!globalThis.crypto?.subtle) throw new Error('unsupported');
     const email = this.normalize(rawEmail);
     const accounts = this.registry();
     const existing = accounts[email];
