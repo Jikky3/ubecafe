@@ -238,7 +238,8 @@ export const BackupEngine = {
       groceryChecked: Array.isArray(data.grocery?.checked) ? data.grocery.checked.length : 0,
       customFoods: Array.isArray(data.customFoods) ? data.customFoods.length
         : isPlainObject(data.customFoods) ? Object.keys(data.customFoods).length : 0,
-      otherKeys: Object.keys(data).filter((k) => !['profile', 'recipes', 'plan', 'supplements', 'grocery', 'customFoods'].includes(k)),
+      hasUiState: 'ui' in data,
+      otherKeys: Object.keys(data).filter((k) => !['profile', 'recipes', 'plan', 'supplements', 'grocery', 'customFoods', 'ui'].includes(k)),
     };
   },
 };

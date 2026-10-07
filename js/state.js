@@ -27,6 +27,14 @@ export const loadUserData = () => ({
   ui: Storage.load(Storage.KEYS.ui, DEFAULT_UI),
 });
 
+export const USER_DATA_KEYS = ['profile', 'recipes', 'plan', 'supplements', 'grocery', 'ui'];
+
+/** Everything the signed-in user has, as exported in a backup: stored keys plus the live (possibly seeded) state. */
+export const exportUserData = () => ({
+  ...Storage.scopeData(),
+  ...Object.fromEntries(USER_DATA_KEYS.map((key) => [key, structuredClone(state[key])])),
+});
+
 export const recipesById = () => new Map(state.recipes.map((r) => [r.id, r]));
 
 export const currentTargets = () => NutritionEngine.calculate(state.profile);

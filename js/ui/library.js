@@ -58,7 +58,7 @@ export const RecipeLibrary = {
       return `
         <li>
           <article class="card recipe-card">
-            <h3>${title}</h3>
+            <h3><button type="button" class="link-button" data-view-recipe="${escapeHTML(recipe.id)}">${title}</button></h3>
             <p class="meta">${recipe.servings} serving${recipe.servings === 1 ? '' : 's'} · per serving${isSafe && flagged.length ? ', with your swaps' : ''}</p>
             <dl class="macro-chips">
               <div><dt>kcal</dt><dd>${fmt(p.calories)}</dd></div>
@@ -68,6 +68,7 @@ export const RecipeLibrary = {
             </dl>
             ${checks ? `<ul class="allergy-list" aria-label="Allergy and diet check for ${title}">${checks}</ul>` : ''}
             <div class="button-row">
+              <button type="button" class="btn btn--secondary" data-view-recipe="${escapeHTML(recipe.id)}" aria-label="View ${title}">View</button>
               <button type="button" class="btn btn--ghost" data-action="edit" data-id="${recipe.id}" aria-label="Edit ${title}">Edit</button>
               <button type="button" class="btn btn--ghost btn--danger" data-action="delete" data-id="${recipe.id}" aria-label="Delete ${title}">Delete</button>
             </div>

@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ube Café Nutrition Planner: Meal Plans, Macro Targets & Grocery Lists</title>
+  <!-- [html-validate-disable-next long-title -- 69 characters as rendered; the rule counts "&amp;amp;" as five] -->
+  <title>Ube Café Nutrition Planner: Meal Plans, Macro Targets &amp; Grocery Lists</title>
   <meta name="description" content="Free, private meal planner: create an account, set goals, diet and allergies, and get Mifflin-St Jeor calorie and macro targets, 11 micronutrient RDAs, allergy-safe recipe swaps, food recommendations with reasons, supplement timing and a Sunday grocery list.">
   <meta name="keywords" content="meal planner, nutrition calculator, macro calculator, Mifflin-St Jeor, micronutrients, RDA, recipe nutrition analyzer, supplement timing, grocery list generator, weekly meal plan, allergy substitutions, nut-free, vegan, keto, paleo, onboarding">
   <meta name="author" content="Ube Café">
@@ -31,6 +32,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
   <script type="application/ld+json">
   {
@@ -58,10 +61,13 @@
           "RDA targets for vitamin A, C, D, B12, calcium, iron, potassium, magnesium, zinc, fiber and omega-3",
           "Body composition: BMI, waist-to-hip and waist-to-height ratios, lean body mass",
           "Allergen and diet screening (peanuts, tree nuts, dairy, gluten, soy, eggs, shellfish; vegetarian, vegan, pescatarian, keto, paleo) with nutritionally similar substitutions",
-          "Recipe text importer and simulated photo OCR with an embedded nutrition dictionary",
+          "Recipe text importer and on-device photo OCR (Tesseract.js) with an embedded nutrition dictionary",
+          "Cook-along recipe view linked from the planner, timeline, library and suggestions",
           "Rule-based food recommendations with reasons",
           "Meal timeline and supplement timing optimizer",
-          "Weekly grocery list grouped by store aisle"
+          "Weekly grocery list grouped by store aisle",
+          "Export and import of all data, with optional passphrase-encrypted backups",
+          "Installable offline web app"
         ]
       },
       {
@@ -241,6 +247,7 @@
 
       <div class="wizard-progress">
         <p id="wizard-progress-label" class="wizard-progress__label"></p>
+        <!-- [html-validate-disable-next prefer-native-element -- a stepped "step 2 of 4" meter whose aria-valuetext names the step; <progress> cannot carry that text] -->
         <div id="wizard-progressbar" class="bar wizard-progress__bar" role="progressbar" aria-labelledby="wizard-progress-label" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1">
           <span id="wizard-progress-fill" class="bar__fill bar__fill--ok"></span>
         </div>
@@ -503,6 +510,7 @@
             <p class="section__intro">Supplements placed by absorption rules: fat-soluble vitamins with your fattiest meal, iron with vitamin C and away from calcium and coffee, magnesium in the evening.</p>
           </header>
           <div class="split">
+            <!-- [html-validate-disable-next wcag/h32 -- choices apply instantly on change; there is nothing to submit] -->
             <form id="supplement-form" class="card form" aria-labelledby="supplement-legend">
               <div class="field">
                 <label for="schedule-day">Schedule for</label>
@@ -520,7 +528,10 @@
                 </div>
               </fieldset>
             </form>
-            <ol id="timeline" class="timeline" aria-label="Meal and supplement timeline"></ol>
+            <div>
+              <h3 id="timeline-title" class="sr-only">Meal and supplement timeline</h3>
+              <ol id="timeline" class="timeline" aria-labelledby="timeline-title"></ol>
+            </div>
           </div>
         </section>
       </div>
@@ -566,6 +577,75 @@
       <button type="button" id="drawer-signout" class="btn btn--secondary btn--block">Sign out</button>
       <button type="button" id="drawer-delete" class="btn btn--ghost btn--danger btn--block">Delete account</button>
     </div>
+  <section id="backup" class="drawer__section" aria-labelledby="backup-heading">
+    <header>
+      <h3 id="backup-heading" tabindex="-1">Back up &amp; restore</h3>
+      <p class="field__hint">Save everything for <strong data-backup-owner>your account</strong> (profile, recipes, meal plan, supplements and grocery checks) to a file you keep, then restore it on this or another device. The file is created on your device and goes nowhere unless you move it.</p>
+      <p id="storage-status" class="field__hint"></p>
+    </header>
+
+    <div class="backup-grid backup-grid--stacked">
+      <div class="drawer__card">
+        <h4 id="export-heading">Download a backup</h4>
+        <form id="export-form" class="form" novalidate aria-labelledby="export-heading">
+          <div class="check">
+            <input type="checkbox" id="export-encrypt" aria-controls="export-passphrase-fields">
+            <label for="export-encrypt">Protect the file with a passphrase</label>
+          </div>
+          <div id="export-passphrase-fields" class="form" hidden>
+            <div class="field">
+              <label for="export-passphrase">Passphrase <span class="field__hint">(at least 8 characters)</span></label>
+              <input type="password" id="export-passphrase" autocomplete="new-password" minlength="8" aria-describedby="export-passphrase-hint export-passphrase-error">
+              <p id="export-passphrase-hint" class="field__hint">The file is encrypted with AES-GCM using a key stretched from this passphrase. Your account password works if you will remember it. A forgotten passphrase cannot be recovered.</p>
+              <p id="export-passphrase-error" class="field-error"></p>
+            </div>
+            <div class="field">
+              <label for="export-passphrase-confirm">Confirm passphrase</label>
+              <input type="password" id="export-passphrase-confirm" autocomplete="new-password" aria-describedby="export-passphrase-confirm-error">
+              <p id="export-passphrase-confirm-error" class="field-error"></p>
+            </div>
+          </div>
+          <button type="submit" class="btn btn--primary btn--block" id="btn-export">Download backup</button>
+        </form>
+      </div>
+
+      <div class="drawer__card">
+        <h4 id="import-heading">Restore from a backup</h4>
+        <form id="import-form" class="form" novalidate aria-labelledby="import-heading">
+          <div class="field">
+            <label for="import-file">Backup file <span class="field__hint">(.json from Ube Café)</span></label>
+            <input type="file" id="import-file" accept=".json,application/json" aria-describedby="import-file-error">
+            <p id="import-file-error" class="field-error"></p>
+          </div>
+          <div class="field" id="import-passphrase-field" hidden>
+            <label for="import-passphrase">Passphrase for this backup</label>
+            <input type="password" id="import-passphrase" autocomplete="off" aria-describedby="import-passphrase-error">
+            <p id="import-passphrase-error" class="field-error"></p>
+          </div>
+          <button type="submit" class="btn btn--secondary btn--block" id="btn-import-check">Check backup</button>
+        </form>
+
+        <div id="import-review" class="import-review" tabindex="-1" role="group" aria-labelledby="import-review-heading" hidden>
+          <h5 id="import-review-heading">This backup contains</h5>
+          <ul id="import-summary" class="import-review__list"></ul>
+          <p class="import-review__warning">Restoring replaces all current data for <strong data-backup-owner>your account</strong> on this device. This cannot be undone, so download a backup first if you are unsure.</p>
+          <div class="button-row">
+            <button type="button" class="btn btn--primary" id="btn-import-confirm">Replace my data</button>
+            <button type="button" class="btn btn--ghost" id="btn-import-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  </dialog>
+
+  <dialog id="recipe-dialog" class="recipe-dialog" aria-labelledby="recipe-view-title">
+    <div class="recipe-dialog__bar">
+      <button type="button" class="btn btn--ghost" data-dialog-action="edit">Edit recipe</button>
+      <button type="button" class="btn btn--ghost" data-dialog-action="print">Print</button>
+      <button type="button" class="btn btn--secondary" data-dialog-action="close">Close<span class="sr-only"> recipe</span></button>
+    </div>
+    <div id="recipe-dialog-body" class="recipe-view"></div>
   </dialog>
 
   <footer class="site-footer">

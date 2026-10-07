@@ -13,7 +13,7 @@
  * installed copies keep serving the old files. Add new files to APP_SHELL
  * (tests/backup.test.js checks that every js/ module is listed).
  */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE = `ubecafe-shell-${CACHE_VERSION}`;
 const FONT_CACHE = 'ubecafe-fonts-v1';
 const FONT_HOSTS = new Set(['fonts.googleapis.com', 'fonts.gstatic.com']);
@@ -37,27 +37,32 @@ const APP_SHELL = [
   'js/data/constants.js',
   'js/data/foods.js',
   'js/data/nutrients.js',
+  'js/data/restrictions.js',
   'js/data/seeds.js',
-  'js/engines/accounts.js',
+  'js/engines/auth.js',
   'js/engines/backup.js',
-  'js/engines/biometrics.js',
   'js/engines/grocery.js',
+  'js/engines/nutrition.js',
   'js/engines/ocr.js',
+  'js/engines/recipe-manager.js',
   'js/engines/recipe-match.js',
-  'js/engines/recipe-parser.js',
   'js/engines/recommendations.js',
   'js/engines/schedule.js',
-  'js/ui/account.js',
+  'js/engines/substitution.js',
+  'js/ui/auth-view.js',
   'js/ui/backup.js',
   'js/ui/dashboard.js',
   'js/ui/grocery.js',
+  'js/ui/library.js',
   'js/ui/ocr.js',
+  'js/ui/onboarding.js',
   'js/ui/planner.js',
-  'js/ui/profile.js',
+  'js/ui/profile-drawer.js',
+  'js/ui/recipe-importer.js',
   'js/ui/recipe-view.js',
-  'js/ui/recipes.js',
   'js/ui/recommendations.js',
   'js/ui/schedule.js',
+  'js/ui/tabs.js',
   'js/ui/theme.js',
 ];
 

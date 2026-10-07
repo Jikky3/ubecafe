@@ -12,6 +12,8 @@ export const PlannerUI = {
     $('#planner-grid').addEventListener('change', (e) => {
       const { day, slot } = e.target.dataset;
       state.plan[day][slot] = e.target.value;
+      e.target.nextElementSibling?.remove();
+      e.target.insertAdjacentHTML('afterend', this.viewLink(day, MEAL_SLOTS.find((s) => s.id === slot)));
       Storage.save(Storage.KEYS.plan, state.plan);
       App.renderNutrition();
       GroceryUI.render();
@@ -23,6 +25,14 @@ export const PlannerUI = {
       App.renderAll();
       announce('Weekly plan cleared.');
     });
+  },
+
+  /** "Recipe" link beside a slot's picker, so the planned meal can be followed while cooking. */
+  viewLink(day, slot) {
+    const recipe = state.recipes.find((r) => r.id === state.plan[day]?.[slot.id]);
+    if (!recipe) return '';
+    return `<button type="button" class="btn btn--ghost btn--small" data-view-recipe="${escapeHTML(recipe.id)}" data-day="${day}" data-slot="${slot.id}"
+      aria-label="View recipe: ${escapeHTML(recipe.title)}, ${DAY_LABELS[day]} ${slot.label.toLowerCase()}">Recipe</button>`;
   },
 
   render() {
@@ -44,7 +54,10 @@ export const PlannerUI = {
         ${MEAL_SLOTS.map((slot) => `
           <div class="field">
             <label for="plan-${day}-${slot.id}">${slot.label} <span class="field__hint">${slot.display}</span></label>
-            <select id="plan-${day}-${slot.id}" data-day="${day}" data-slot="${slot.id}">${options(state.plan[day]?.[slot.id])}</select>
+            <div class="plan-slot">
+              <select id="plan-${day}-${slot.id}" data-day="${day}" data-slot="${slot.id}">${options(state.plan[day]?.[slot.id])}</select>
+              ${this.viewLink(day, slot)}
+            </div>
           </div>`).join('')}
       </fieldset>`).join('');
   },

@@ -1,5 +1,5 @@
 import { NUTRIENTS, NUTRIENT_BY_KEY } from '../data/nutrients.js';
-import { RecipeParser } from './recipe-parser.js';
+import { RecipeManager } from './recipe-manager.js';
 
 /**
  * Links nutrient gaps to concrete meals: how far a day is from a target,
@@ -43,13 +43,16 @@ export class RecipeMatcher {
    * "increase" favours the most of the nutrient per serving (ties: fewer calories);
    * "decrease" favours the least, ignoring tiny snacks that could never replace a meal.
    * Recipes already planned for the day are listed last so suggestions add variety.
+   * `analyze` lets callers apply the user's allergy and diet swaps; recipes it marks
+   * unsafe (`isSafe === false`) are never suggested.
    * @returns {{recipe, amount, pctOfTarget, calories}[]}
    */
-  static rankRecipes(recipes, key, { direction, target, excludeIds = [], limit = 2 }) {
+  static rankRecipes(recipes, key, { direction, target, excludeIds = [], limit = 2, analyze = (r) => RecipeManager.analyze(r) }) {
     const excluded = new Set(excludeIds);
-    const scored = recipes.map((recipe) => {
-      const { perServing } = RecipeParser.analyze(recipe);
-      return { recipe, amount: perServing[key], calories: perServing.calories, pctOfTarget: target > 0 ? Math.round((perServing[key] / target) * 100) : 0 };
+    const scored = recipes.flatMap((recipe) => {
+      const { perServing, isSafe } = analyze(recipe);
+      if (isSafe === false) return [];
+      return [{ recipe, amount: perServing[key], calories: perServing.calories, pctOfTarget: target > 0 ? Math.round((perServing[key] / target) * 100) : 0 }];
     });
     const pool = direction === 'increase'
       ? scored.filter((s) => s.amount > 0)

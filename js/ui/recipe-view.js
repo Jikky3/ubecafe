@@ -1,11 +1,11 @@
 import { DAYS, DAY_LABELS, MEAL_SLOTS, SLOT_BY_ID, SUPPLEMENT_BY_ID } from '../data/constants.js';
 import { NUTRIENTS } from '../data/nutrients.js';
 import { RecipeMatcher } from '../engines/recipe-match.js';
-import { RecipeParser } from '../engines/recipe-parser.js';
 import { ScheduleOptimizer } from '../engines/schedule.js';
-import { currentTargets, mealsForDay, state } from '../state.js';
+import { SubstitutionEngine } from '../engines/substitution.js';
+import { App } from '../main.js';
+import { analyzeForUser, blockedHits, currentTargets, mealsForDay, state } from '../state.js';
 import { $, announce, escapeHTML, fmt } from '../util.js';
-import { RecipeUI } from './recipes.js';
 
 const HASH_PREFIX = '#recipe/';
 
@@ -38,10 +38,12 @@ export const RecipeView = {
       if (action === 'close') this.dialog.close();
       if (action === 'print') window.print();
       if (action === 'edit') {
-        const { id } = this.dialog.dataset;
+        const recipe = state.recipes.find((r) => r.id === this.dialog.dataset.id);
+        this.opener = null; // focus moves to the edit form instead
         this.dialog.close();
-        RecipeUI.edit(id);
-        $('#recipe-form').scrollIntoView({ block: 'start' });
+        App.tabs.select('tab-recipes');
+        App.importer.edit(recipe);
+        $('#lib-form').scrollIntoView({ block: 'start' });
       }
     });
 
@@ -73,6 +75,7 @@ export const RecipeView = {
     }
     const id = decodeURIComponent(hash.slice(HASH_PREFIX.length));
     if (this.dialog.open && this.dialog.dataset.id === id) return;
+    if (!state.account) return; // App.showApp() calls this again after sign-in
     if (!this.open(id)) announce('That recipe is not in your library.');
   },
 
@@ -83,7 +86,7 @@ export const RecipeView = {
    * @returns {boolean} whether the recipe exists
    */
   open(id, context = {}, opener = document.activeElement) {
-    const recipe = state.recipes.find((r) => r.id === id);
+    const recipe = state.account && state.recipes.find((r) => r.id === id);
     if (!recipe) return false;
     this.opener = opener;
     if (!window.location.hash.startsWith(HASH_PREFIX)) this.returnHash = window.location.hash;
@@ -104,7 +107,7 @@ export const RecipeView = {
   },
 
   render(recipe, { day, slot } = {}) {
-    const { ingredients, perServing: p, unmatched } = RecipeParser.analyze(recipe);
+    const { ingredients, perServing: p, unmatched, isSafe, flagged } = analyzeForUser(recipe);
     const { targets } = currentTargets();
     const highlights = RecipeMatcher.highlights(p, targets);
     const steps = recipe.instructions.split(/\r?\n/).map((s) => s.replace(/^\s*\d+[.)]\s*/, '').trim()).filter(Boolean);
@@ -116,11 +119,22 @@ export const RecipeView = {
       ? `<p class="recipe-view__planned"><strong>On your plan:</strong> ${planned.map((s) => escapeHTML(s.label)).join(', ')}</p>`
       : '<p class="recipe-view__planned">Not on this week\'s plan yet. Pick it in the weekly meal plan to add it.</p>';
 
+    const swapNote = (ing) => {
+      const flag = flagged.find((f) => f.raw === ing.raw);
+      if (!flag) return '';
+      const badge = SubstitutionEngine.badge(flag.hits, { isAllergy: flag.isAllergy, blocked: !flag.substitute });
+      if (!flag.substitute) return `<span class="cook-swap">${badge} No safe substitute</span>`;
+      if (flag.substitute.name === 'Omit') return `<span class="cook-swap">${badge} Leave this out. ${escapeHTML(flag.substitute.note)}</span>`;
+      return `<span class="cook-swap">${badge} Use <strong>${escapeHTML(flag.substitute.name)}</strong> instead (${escapeHTML(flag.substitute.ratio)}). ${escapeHTML(flag.substitute.note)}</span>`;
+    };
     const ingredientItems = ingredients.map((ing, i) => `
       <li class="check">
         <input type="checkbox" id="cook-ing-${i}">
-        <label for="cook-ing-${i}">${escapeHTML(ing.raw)}${ing.foodId ? '' : ' <span class="badge badge--warn"><span aria-hidden="true">!</span> No nutrition data</span>'}</label>
+        <label for="cook-ing-${i}">${escapeHTML(ing.raw)}${ing.foodId || ing.swappedFrom || ing.omitted ? '' : ' <span class="badge badge--warn"><span aria-hidden="true">!</span> No nutrition data</span>'}${swapNote(ing)}</label>
       </li>`).join('');
+    const safetyNote = !isSafe
+      ? `<p class="analysis__danger">${SubstitutionEngine.badge(blockedHits(flagged), { blocked: true })} This recipe contains an allergen with no safe substitute, so it is left out of your plan, dashboard and grocery list.</p>`
+      : flagged.length ? `<p class="analysis__warn">Adjusted for your allergies and diet: ${flagged.length} swap${flagged.length === 1 ? '' : 's'}, marked in the ingredient list. Nutrition below includes them.</p>` : '';
     const stepItems = steps.map((step, i) => `
       <li class="check">
         <input type="checkbox" id="cook-step-${i}">
@@ -136,10 +150,11 @@ export const RecipeView = {
       <header class="recipe-view__header">
         <p class="eyebrow">${hasContext ? `${DAY_LABELS[day]} · ${SLOT_BY_ID[slot].label} · ${SLOT_BY_ID[slot].display}` : 'Recipe'}</p>
         <h2 id="recipe-view-title" class="recipe-view__title" tabindex="-1">${escapeHTML(recipe.title)}</h2>
-        <p class="recipe-card__meta">Makes ${recipe.servings} serving${recipe.servings === 1 ? '' : 's'} · nutrition shown per serving</p>
+        <p class="meta">Makes ${recipe.servings} serving${recipe.servings === 1 ? '' : 's'} · nutrition shown per serving</p>
         ${plannedNote}
       </header>
 
+      ${safetyNote}
       <dl class="macro-chips">
         <div><dt>kcal</dt><dd>${fmt(p.calories)}</dd></div>
         <div><dt>Protein</dt><dd>${fmt(p.protein)} g</dd></div>
@@ -183,7 +198,8 @@ export const RecipeView = {
   /** Timing tips and supplements for the planned meal this recipe was opened from. */
   renderMealContext(recipe, day, slot) {
     const meals = mealsForDay(day);
-    const meal = meals[slot]?.recipe.id === recipe.id ? meals[slot] : { recipe, nutrients: RecipeParser.analyze(recipe).perServing };
+    const planned = meals[slot]?.recipe.id === recipe.id && !meals[slot].blocked;
+    const meal = planned ? meals[slot] : { recipe, nutrients: analyzeForUser(recipe).perServing };
     const { selected, coffeeAtBreakfast } = state.supplements;
     const tips = ScheduleOptimizer.mealTips(slot, meal, coffeeAtBreakfast);
     const supplements = ScheduleOptimizer.build({ ...meals, [slot]: meal }, selected, coffeeAtBreakfast)[slot];

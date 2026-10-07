@@ -53,6 +53,7 @@ export class RecommendationEngine {
       if (!safe.length) return;
       const r = ratio(key);
       recs.push({
+        key,
         food: safe.join(' / '),
         reason,
         restrictionNote: removed.length ? `Adjusted for your diet and allergies: left out ${removed.join(', ')}.` : '',

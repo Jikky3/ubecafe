@@ -37,11 +37,11 @@ export const ScheduleUI = {
       const meal = meals[slot.id];
       let mealText = '<p class="timeline__meal timeline__meal--empty">No meal planned</p>';
       if (meal?.blocked) {
-        mealText = `<p class="timeline__meal">${escapeHTML(meal.recipe.title)}</p>
+        mealText = `<p class="timeline__meal"><button type="button" class="link-button" data-view-recipe="${escapeHTML(meal.recipe.id)}" data-day="${state.viewDay}" data-slot="${slot.id}">${escapeHTML(meal.recipe.title)}</button></p>
           <p class="meta">${SubstitutionEngine.badge(blockedHits(meal.flagged), { blocked: true })} No safe substitute, so this meal is excluded. Choose another recipe.</p>`;
       } else if (meal) {
         const swaps = meal.flagged.map((f) => (f.substitute.name === 'Omit' ? `${f.original.toLowerCase()} omitted` : `${f.substitute.name} for ${f.original.toLowerCase()}`));
-        mealText = `<p class="timeline__meal">${escapeHTML(meal.recipe.title)}</p>
+        mealText = `<p class="timeline__meal"><button type="button" class="link-button" data-view-recipe="${escapeHTML(meal.recipe.id)}" data-day="${state.viewDay}" data-slot="${slot.id}">${escapeHTML(meal.recipe.title)}</button></p>
           <p class="meta">${fmt(meal.nutrients.calories)} kcal · ${fmt(meal.nutrients.protein)} g protein · ${fmt(meal.nutrients.fat)} g fat · ${fmt(meal.nutrients.vitaminC)} mg vitamin C</p>
           ${swaps.length ? `<p class="meta">Swaps: ${escapeHTML(swaps.join('; '))}.</p>` : ''}`;
       }

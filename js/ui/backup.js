@@ -227,6 +227,7 @@ export const BackupUI = {
       plural(summary.groceryChecked, 'checked grocery item'),
     ];
     if (summary.customFoods) items.push(plural(summary.customFoods, 'custom food'));
+    if (summary.hasUiState) items.push('Which tab you had open');
     if (summary.otherKeys.length) items.push(`Other saved data: ${summary.otherKeys.join(', ')}`);
     $('#import-summary').innerHTML = items.map((item) => `<li>${escapeHTML(item)}</li>`).join('');
     this.renderOwner();

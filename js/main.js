@@ -15,6 +15,8 @@ import { RecommendationsUI } from './ui/recommendations.js';
 import { ScheduleUI } from './ui/schedule.js';
 import { Tabs } from './ui/tabs.js';
 import { ThemeUI } from './ui/theme.js';
+import { BackupUI } from './ui/backup.js';
+import { RecipeView } from './ui/recipe-view.js';
 import { $, announce, fmt } from './util.js';
 
 
@@ -37,6 +39,8 @@ export const App = {
     PlannerUI.init();
     ScheduleUI.init();
     GroceryUI.init();
+    BackupUI.init();
+    RecipeView.init();
     this.importer = new RecipeImporter($('#library-importer'), {
       prefix: 'lib',
       onSaved: (recipe, isUpdate) => {
@@ -87,6 +91,23 @@ export const App = {
     this.renderAll();
     this.showView('app', { focus });
     this.tabs.select(state.ui.tab);
+    BackupUI.renderOwner();
+    RecipeView.openFromHash();
+  },
+
+  /** Swaps in the signed-in account's freshly restored data and refreshes every view. */
+  reloadUserData() {
+    Object.assign(state, loadUserData());
+    if (!state.profile.onboarded) {
+      $('#profile-drawer').close();
+      OnboardingWizard.start('onboarding');
+      return;
+    }
+    ScheduleUI.syncForm();
+    GroceryUI.syncForm();
+    this.importer.reset();
+    this.renderAll();
+    ProfileDrawer.render();
   },
 
   setViewDay(day) {
@@ -116,8 +137,7 @@ export const App = {
   },
 
   signOut(message) {
-    const dialog = $('#profile-drawer');
-    if (dialog.open) dialog.close();
+    ['#profile-drawer', '#recipe-dialog'].forEach((sel) => { if ($(sel).open) $(sel).close(); });
     const name = state.account ? firstName() : '';
     AuthManager.signOut();
     Storage.scope = null;
