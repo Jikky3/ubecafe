@@ -3,16 +3,16 @@
  * Deterministic, rule-based meal planning & nutrition engine (no AI).
  *
  * Modules
- *  1. Reference data      – nutrients, food dictionary, units, aisles, seeds
- *  2. Utilities & Storage – formatting, escaping, localStorage persistence
- *  3. BiometricsEngine    – Mifflin-St Jeor energy + macro/micro targets
- *  4. RecipeParser        – raw text + ingredient parsing, nutrition analysis
- *     AllergenGuard       – allergen detection + rule-based safe substitutions
- *  5. RecommendationEngine– if/else "which food & why" rules
- *  6. ScheduleOptimizer   – meal timeline + supplement timing rules
- *  7. GroceryAggregator   – weekly ingredient roll-up grouped by aisle
- *  8. AccountManager      – local multi-user accounts (PBKDF2-hashed passwords)
- *  9. UI controllers      – rendering and accessible event handling
+ *  1. Reference data        – nutrients, food dictionary, restrictions, units, seeds
+ *  2. Utilities & Storage   – formatting, escaping, per-account localStorage
+ *  3. NutritionEngine       – Mifflin-St Jeor energy, macro/micro targets, body composition
+ *  4. RecipeManager         – raw text + ingredient parsing, nutrition analysis
+ *  5. SubstitutionEngine    – allergen & diet screening with rule-based safe swaps
+ *  6. RecommendationEngine  – if/else "which food & why" rules
+ *  7. ScheduleOptimizer     – meal timeline + supplement timing rules
+ *  8. GroceryAggregator     – weekly ingredient roll-up grouped by aisle
+ *  9. AuthManager           – local accounts with PBKDF2-hashed passwords
+ * 10. UI controllers        – auth view, onboarding wizard, tabs, panels, drawer
  */
 'use strict';
 
@@ -104,7 +104,7 @@ const FOOD_ROWS = [
   ['chia', 'Chia seeds', PANTRY, ['chia', 'chia seeds'], 12, 192, [486, 16.5, 42, 30.7, 0, 34.4, 0, 1.6, 0, 0, 631, 7.7, 407, 335, 4.6, 17.8]],
   ['pumpkin-seeds', 'Pumpkin seeds', PANTRY, ['pumpkin seeds', 'pepitas'], 28, 129, [559, 30, 10.7, 49, 1.4, 6, 1, 1.9, 0, 0, 46, 8.8, 809, 592, 7.8, 0.12]],
   ['peanut-butter', 'Peanut butter', PANTRY, ['peanut butter'], 32, 256, [588, 25, 20, 50, 9.2, 6, 0, 0, 0, 0, 43, 1.9, 649, 154, 2.5, 0.03]],
-  ['honey', 'Honey', PANTRY, ['honey', 'maple syrup'], 21, 339, [304, 0.3, 82, 0, 82, 0.2, 0, 0.5, 0, 0, 6, 0.4, 52, 2, 0.2, 0]],
+  ['honey', 'Honey', PANTRY, ['honey'], 21, 339, [304, 0.3, 82, 0, 82, 0.2, 0, 0.5, 0, 0, 6, 0.4, 52, 2, 0.2, 0]],
   ['almond-butter', 'Almond butter', PANTRY, ['almond butter', 'cashew butter', 'nut butter'], 32, 256, [614, 21, 19, 56, 4.4, 10, 0, 0, 0, 0, 264, 3.5, 748, 279, 3.3, 0.4]],
   // Allergy-safe substitutes (see ALLERGY_SUBSTITUTES)
   ['sunflower-butter', 'Sunflower seed butter', PANTRY, ['sunflower seed butter', 'sunflower butter', 'sunbutter'], 32, 256, [617, 17.3, 23.3, 55.2, 3, 5.7, 0, 0.2, 0, 0, 64, 4.1, 576, 311, 5.3, 0.07]],
@@ -120,6 +120,10 @@ const FOOD_ROWS = [
   ['black-pepper', 'Black pepper', SPICES, ['pepper', 'black pepper'], 1, 110, [251, 10, 64, 3.3, 0.6, 25, 27, 0, 0, 0, 443, 9.7, 1329, 171, 1.2, 0.15]],
   ['cumin', 'Ground cumin', SPICES, ['cumin'], 2, 96, [375, 17.8, 44, 22, 2.3, 10.5, 64, 7.7, 0, 0, 931, 66, 1788, 366, 4.8, 0.2]],
   ['cinnamon', 'Cinnamon', SPICES, ['cinnamon'], 3, 125, [247, 4, 81, 1.2, 2.2, 53, 15, 3.8, 0, 0, 1002, 8.3, 431, 60, 1.8, 0.01]],
+  ['maple-syrup', 'Maple syrup', PANTRY, ['maple syrup', 'agave'], 20, 315, [260, 0, 67, 0.1, 60, 0, 0, 0, 0, 0, 102, 0.1, 212, 21, 1.5, 0]],
+  ['cauliflower', 'Cauliflower', PRODUCE, ['cauliflower', 'cauliflower rice', 'riced cauliflower'], 575, 107, [25, 1.9, 5, 0.3, 1.9, 2, 0, 48, 0, 0, 22, 0.4, 299, 15, 0.3, 0.04], 'heads'],
+  ['zucchini', 'Zucchini', PRODUCE, ['zucchini', 'courgette', 'zucchini noodles', 'zoodles'], 200, 124, [17, 1.2, 3.1, 0.3, 2.5, 1, 10, 18, 0, 0, 16, 0.4, 261, 18, 0.3, 0.03], 'pcs'],
+  ['romaine', 'Romaine lettuce', PRODUCE, ['romaine', 'lettuce', 'lettuce leaves'], 10, 47, [17, 1.2, 3.3, 0.3, 1.2, 2.1, 436, 4, 0, 0, 33, 1, 247, 14, 0.2, 0.1]],
 ];
 
 const FOOD_DB = Object.fromEntries(
@@ -139,21 +143,44 @@ const FOOD_DB = Object.fromEntries(
   ]),
 );
 
-/* ---------- Allergens ---------- */
 
-const ALLERGENS = [
-  { id: 'peanuts', label: 'Peanuts', option: 'Peanut allergy' },
-  { id: 'tree_nuts', label: 'Tree nuts', option: 'Tree nut allergy' },
-  { id: 'dairy', label: 'Dairy', option: 'Lactose / dairy' },
-  { id: 'gluten', label: 'Gluten', option: 'Gluten sensitivity' },
-  { id: 'soy', label: 'Soy', option: 'Soy free' },
-  { id: 'eggs', label: 'Eggs', option: 'Egg free' },
-];
-const ALLERGEN_BY_ID = Object.fromEntries(ALLERGENS.map((a) => [a.id, a]));
+/* ---------- Dietary restrictions: allergies + diet patterns ---------- */
 
-/** Allergens contained in dictionary foods (oats are flagged for gluten cross-contact). */
-const FOOD_ALLERGENS = {
-  'peanut-butter': ['peanuts'],
+/**
+ * Every exclusion the SubstitutionEngine understands. Allergens are chosen
+ * directly by the user; the remaining categories are implied by diet patterns.
+ */
+const RESTRICTIONS = {
+  peanuts: { label: 'Peanuts', option: 'Peanuts' },
+  tree_nuts: { label: 'Tree nuts', option: 'Tree nuts' },
+  dairy: { label: 'Dairy', option: 'Dairy / lactose' },
+  gluten: { label: 'Gluten', option: 'Gluten' },
+  soy: { label: 'Soy', option: 'Soy' },
+  eggs: { label: 'Eggs', option: 'Eggs' },
+  shellfish: { label: 'Shellfish', option: 'Shellfish' },
+  meat: { label: 'Meat & poultry' },
+  fish: { label: 'Fish' },
+  honey: { label: 'Honey' },
+  grains: { label: 'Grains' },
+  legumes: { label: 'Legumes' },
+  starch: { label: 'Starchy vegetables' },
+  sugar: { label: 'Sugars & syrups' },
+  high_carb_fruit: { label: 'High-carb fruit' },
+};
+const ALLERGY_IDS = ['peanuts', 'tree_nuts', 'dairy', 'gluten', 'soy', 'eggs', 'shellfish'];
+
+const DIETS = {
+  omnivore: { label: 'Omnivore', description: 'Everything on the menu.', excludes: [] },
+  vegetarian: { label: 'Vegetarian', description: 'No meat, poultry or seafood.', excludes: ['meat', 'fish', 'shellfish'] },
+  vegan: { label: 'Vegan', description: 'No animal products, including dairy, eggs and honey.', excludes: ['meat', 'fish', 'shellfish', 'dairy', 'eggs', 'honey'] },
+  pescatarian: { label: 'Pescatarian', description: 'Seafood, but no meat or poultry.', excludes: ['meat'] },
+  keto: { label: 'Keto', description: 'Very low carb: no grains, legumes, starches or sugars.', excludes: ['grains', 'legumes', 'starch', 'sugar', 'high_carb_fruit'] },
+  paleo: { label: 'Paleo', description: 'No grains, legumes or dairy.', excludes: ['grains', 'legumes', 'dairy'] },
+};
+
+/** Restriction tags on dictionary foods (oats are tagged gluten for cross-contact). */
+const FOOD_TAGS = {
+  'peanut-butter': ['peanuts', 'legumes'],
   'almond-butter': ['tree_nuts'],
   almonds: ['tree_nuts'],
   walnuts: ['tree_nuts'],
@@ -163,36 +190,66 @@ const FOOD_ALLERGENS = {
   'cottage-cheese': ['dairy'],
   cheddar: ['dairy'],
   butter: ['dairy'],
-  oats: ['gluten'],
-  bread: ['gluten'],
-  pasta: ['gluten'],
-  'soy-sauce': ['soy', 'gluten'],
-  tofu: ['soy'],
-  'soy-milk': ['soy'],
+  oats: ['gluten', 'grains'],
+  'gf-oats': ['grains'],
+  'oat-milk': ['grains'],
+  bread: ['gluten', 'grains'],
+  'gf-bread': ['grains'],
+  pasta: ['gluten', 'grains'],
+  'gf-pasta': ['grains'],
+  'brown-rice': ['grains'],
+  quinoa: ['grains'],
+  'soy-sauce': ['soy', 'gluten', 'legumes'],
+  tofu: ['soy', 'legumes'],
+  'soy-milk': ['soy', 'legumes'],
   eggs: ['eggs'],
+  chicken: ['meat'],
+  beef: ['meat'],
+  salmon: ['fish'],
+  tuna: ['fish'],
+  sardines: ['fish'],
+  shrimp: ['shellfish'],
+  lentils: ['legumes'],
+  'black-beans': ['legumes'],
+  chickpeas: ['legumes'],
+  honey: ['honey', 'sugar'],
+  'maple-syrup': ['sugar'],
+  'sweet-potato': ['starch'],
+  banana: ['high_carb_fruit'],
+  apple: ['high_carb_fruit'],
+  orange: ['high_carb_fruit'],
 };
-Object.entries(FOOD_ALLERGENS).forEach(([id, allergens]) => { FOOD_DB[id].allergens = allergens; });
-Object.values(FOOD_DB).forEach((food) => { food.allergens ??= []; });
+Object.values(FOOD_DB).forEach((food) => { food.tags = FOOD_TAGS[food.id] ?? []; });
 
 /** Fallback keywords for ingredients the dictionary does not recognize. */
-const ALLERGEN_KEYWORDS = {
+const RESTRICTION_KEYWORDS = {
   peanuts: ['peanut', 'groundnut'],
   tree_nuts: ['cashew', 'pecan', 'pistachio', 'hazelnut', 'macadamia', 'pine nut', 'brazil nut', 'praline', 'marzipan', 'nutella'],
   dairy: ['cream', 'ghee', 'whey', 'casein', 'parmesan', 'mozzarella', 'ricotta', 'buttermilk', 'kefir', 'custard'],
   gluten: ['wheat', 'flour', 'barley', 'rye', 'couscous', 'semolina', 'bulgur', 'farro', 'spelt', 'seitan', 'breadcrumb', 'panko', 'cracker'],
   soy: ['soy', 'edamame', 'tempeh', 'miso'],
   eggs: ['egg', 'mayonnaise', 'mayo', 'meringue', 'aioli'],
+  shellfish: ['prawn', 'crab', 'lobster', 'scallop', 'clam', 'mussel', 'oyster', 'crawfish', 'langoustine'],
+  meat: ['bacon', 'ham', 'pork', 'lamb', 'turkey', 'sausage', 'prosciutto', 'salami', 'chorizo', 'veal', 'duck', 'venison', 'pepperoni', 'gelatin'],
+  fish: ['fish', 'cod', 'tilapia', 'halibut', 'trout', 'anchovy', 'anchovies', 'mackerel', 'haddock'],
+  honey: ['honey'],
+  grains: ['flour', 'wheat', 'barley', 'rye', 'couscous', 'cornmeal', 'millet', 'bulgur', 'farro', 'spelt', 'cereal', 'granola', 'cracker'],
+  legumes: ['bean', 'pea', 'edamame', 'tempeh', 'miso', 'hummus'],
+  starch: ['potato', 'corn', 'plantain', 'cassava', 'parsnip'],
+  sugar: ['sugar', 'syrup', 'agave', 'molasses', 'chocolate', 'jam'],
+  high_carb_fruit: ['mango', 'grape', 'pineapple', 'date', 'raisin', 'fig'],
 };
-const ALLERGEN_KEYWORD_PATTERNS = Object.fromEntries(Object.entries(ALLERGEN_KEYWORDS)
+const RESTRICTION_PATTERNS = Object.fromEntries(Object.entries(RESTRICTION_KEYWORDS)
   .map(([id, words]) => [id, new RegExp(`\\b(?:${words.join('|')})(?:e?s)?\\b`)]));
 
 /**
- * Safe, nutritionally similar substitutes per allergen. `foodId` links to the
- * dictionary so swaps keep accurate nutrition and reach the grocery list.
- * `replaces` limits an option to specific source foods; options without it are
- * generic fallbacks. `gramRatio` scales the original weight.
+ * Safe, nutritionally similar substitutes per restriction. `foodId` links to the
+ * dictionary so swaps keep accurate nutrition and reach the grocery list
+ * (`null` means "omit"). `replaces` limits an option to specific source foods;
+ * options without it are generic fallbacks. `gramRatio` scales the original weight.
+ * The engine skips any option that conflicts with another active restriction.
  */
-const ALLERGY_SUBSTITUTES = {
+const SUBSTITUTES = {
   peanuts: [
     { foodId: 'sunflower-butter', ratio: '1:1', gramRatio: 1, replaces: ['peanut-butter'], note: 'Provides healthy fats and a similar creamy texture.' },
     { foodId: 'pumpkin-seeds', ratio: '1:1', gramRatio: 1, note: 'Matches the crunch and adds magnesium and zinc.' },
@@ -200,16 +257,17 @@ const ALLERGY_SUBSTITUTES = {
   tree_nuts: [
     { foodId: 'sunflower-butter', ratio: '1:1', gramRatio: 1, replaces: ['almond-butter'], note: 'Seed butter with the same spreadable texture and healthy fats.' },
     { foodId: 'oat-milk', ratio: '1:1', gramRatio: 1, replaces: ['almond-milk'], note: 'Fortified oat milk keeps calcium and vitamin D without nuts.' },
-    { foodId: 'sunflower-seeds', ratio: '1:1', gramRatio: 1, note: 'Great substitute for walnuts or pine nuts in pestos and salads.' },
+    { foodId: 'soy-milk', ratio: '1:1', gramRatio: 1, replaces: ['almond-milk'], note: 'Fortified soy milk keeps calcium and adds protein.' },
+    { foodId: 'sunflower-seeds', ratio: '1:1', gramRatio: 1, note: 'Toasted seeds replace walnuts or pine nuts in pestos and salads.' },
     { foodId: 'hemp-seeds', ratio: '1:1', gramRatio: 1, note: 'Rich in healthy fats, omega-3 and complete protein.' },
-    { foodId: 'chickpeas', ratio: '1:1', gramRatio: 1, note: 'Roasted chickpeas offer crunch and protein without nut allergens.' },
   ],
   dairy: [
     { foodId: 'nutritional-yeast', ratio: '1 tbsp per 1/4 cup cheese', gramRatio: 0.18, replaces: ['cheddar'], note: 'Replaces cheesy, umami flavor in savory dishes and adds B12.' },
     { foodId: 'olive-oil', ratio: '3/4 the amount', gramRatio: 0.75, replaces: ['butter'], note: 'Heart-healthy fat for cooking and roasting.' },
     { foodId: 'coconut-yogurt', ratio: '1:1', gramRatio: 1, replaces: ['greek-yogurt', 'cottage-cheese'], note: 'Creamy, calcium-fortified yogurt; much lower in protein, so pair with seeds.' },
+    { foodId: 'soy-milk', ratio: '1:1', gramRatio: 1, note: 'Fortified soy milk is the closest match to dairy milk for protein and calcium.' },
     { foodId: 'oat-milk', ratio: '1:1', gramRatio: 1, note: 'Fortified oat milk replaces milk while maintaining calcium and vitamin D.' },
-    { foodId: 'soy-milk', ratio: '1:1', gramRatio: 1, note: 'Fortified soy milk is the closest match to dairy milk for protein.' },
+    { foodId: 'almond-milk', ratio: '1:1', gramRatio: 1, note: 'Fortified almond milk keeps calcium with very few calories.' },
   ],
   gluten: [
     { foodId: 'gf-oats', ratio: '1:1', gramRatio: 1, replaces: ['oats'], note: 'Certified gluten-free oats avoid wheat cross-contact with identical nutrition.' },
@@ -217,15 +275,63 @@ const ALLERGY_SUBSTITUTES = {
     { foodId: 'gf-pasta', ratio: '1:1', gramRatio: 1, replaces: ['pasta'], note: 'Brown rice pasta keeps complex carbohydrates high.' },
     { foodId: 'coconut-aminos', ratio: '1:1', gramRatio: 1, replaces: ['soy-sauce'], note: 'Wheat- and soy-free seasoning with a similar savory taste.' },
     { foodId: 'quinoa', ratio: '1:1', gramRatio: 1, note: 'Naturally gluten-free grain that keeps complex carbs and adds protein.' },
+    { foodId: 'cauliflower', ratio: '1:1', gramRatio: 1, note: 'Riced cauliflower stands in for grains in bowls and stir-fries.' },
   ],
   soy: [
     { foodId: 'coconut-aminos', ratio: '1:1', gramRatio: 1, replaces: ['soy-sauce'], note: 'Soy-free seasoning with a similar savory taste.' },
     { foodId: 'oat-milk', ratio: '1:1', gramRatio: 1, replaces: ['soy-milk'], note: 'Fortified oat milk keeps calcium and vitamin D.' },
-    { foodId: 'chickpeas', ratio: '1:1', gramRatio: 1, note: 'Plant protein that holds its shape like tofu in bowls and curries.' },
+    { foodId: 'almond-milk', ratio: '1:1', gramRatio: 1, replaces: ['soy-milk'], note: 'Fortified almond milk keeps calcium and vitamin D.' },
+    { foodId: 'chicken', ratio: '1:1', gramRatio: 1, replaces: ['tofu'], note: 'Lean protein that cooks like pressed tofu.' },
+    { foodId: 'chickpeas', ratio: '1:1', gramRatio: 1, note: 'Plant protein that holds its shape in bowls and curries.' },
+    { foodId: 'hemp-seeds', ratio: '1/3 the amount', gramRatio: 0.33, note: 'Complete plant protein without soy.' },
   ],
   eggs: [
     { foodId: 'tofu', ratio: '1:1 by weight', gramRatio: 1, replaces: ['eggs'], note: 'Crumbled firm tofu makes a protein-rich, egg-free scramble.' },
     { foodId: 'chia', ratio: '1 tbsp chia + 3 tbsp water per egg', gramRatio: 0.24, note: 'A “chia egg” binds baked goods and adds omega-3.' },
+  ],
+  shellfish: [
+    { foodId: 'chicken', ratio: '1:1', gramRatio: 1, note: 'Lean, mild protein that cooks just as quickly.' },
+    { foodId: 'tofu', ratio: '1:1', gramRatio: 1, note: 'Firm tofu absorbs the same marinades and seasonings.' },
+    { foodId: 'chickpeas', ratio: '1:1', gramRatio: 1, note: 'Shellfish-free protein for bowls and pastas.' },
+  ],
+  meat: [
+    { foodId: 'tofu', ratio: '1:1 by weight', gramRatio: 1, note: 'Complete plant protein with calcium and iron.' },
+    { foodId: 'chickpeas', ratio: '1:1 by weight', gramRatio: 1, note: 'Fiber-rich plant protein that roasts well.' },
+    { foodId: 'mushroom', ratio: '1:1 by weight', gramRatio: 1, note: 'Meaty texture and umami with very few calories; add seeds for protein.' },
+  ],
+  fish: [
+    { foodId: 'tofu', ratio: '1:1 by weight', gramRatio: 1, note: 'Plant protein; add chia or walnuts to replace omega-3.' },
+    { foodId: 'chickpeas', ratio: '1:1 by weight', gramRatio: 1, note: 'Plant protein; add chia or hemp seeds to replace omega-3.' },
+    { foodId: 'mushroom', ratio: '1:1 by weight', gramRatio: 1, note: 'Savory, low-calorie stand-in; add hemp seeds for omega-3.' },
+  ],
+  honey: [
+    { foodId: 'maple-syrup', ratio: '1:1', gramRatio: 1, replaces: ['honey'], note: 'Plant-based sweetener with a similar pour.' },
+    { foodId: null, ratio: 'omit', gramRatio: 0, note: 'Leave it out or sweeten with ripe fruit.' },
+  ],
+  sugar: [
+    { foodId: null, ratio: 'omit', gramRatio: 0, note: 'Leave it out or use a zero-calorie sweetener to taste.' },
+  ],
+  grains: [
+    { foodId: 'chia', ratio: '1/2 the amount', gramRatio: 0.5, replaces: ['oats', 'gf-oats'], note: 'Chia pudding replaces oats with fiber and omega-3.' },
+    { foodId: 'almond-milk', ratio: '1:1', gramRatio: 1, replaces: ['oat-milk'], note: 'Grain-free fortified milk.' },
+    { foodId: 'zucchini', ratio: '1:1', gramRatio: 1, replaces: ['pasta', 'gf-pasta'], note: 'Spiralized zucchini noodles replace pasta.' },
+    { foodId: 'romaine', ratio: '2 leaves per slice', gramRatio: 0.6, replaces: ['bread', 'gf-bread'], note: 'Crisp lettuce wraps replace bread.' },
+    { foodId: 'cauliflower', ratio: '1:1 (cooked volume)', gramRatio: 2.5, note: 'Riced cauliflower replaces rice and grains.' },
+  ],
+  legumes: [
+    { foodId: 'sunflower-butter', ratio: '1:1', gramRatio: 1, replaces: ['peanut-butter'], note: 'Legume-free seed butter with similar fats.' },
+    { foodId: 'coconut-aminos', ratio: '1:1', gramRatio: 1, replaces: ['soy-sauce'], note: 'Legume-free savory seasoning.' },
+    { foodId: 'almond-milk', ratio: '1:1', gramRatio: 1, replaces: ['soy-milk'], note: 'Legume-free fortified milk.' },
+    { foodId: 'chicken', ratio: '1:1', gramRatio: 1, replaces: ['tofu'], note: 'Lean protein in place of tofu.' },
+    { foodId: 'mushroom', ratio: '1:1 by weight', gramRatio: 1, note: 'Hearty, low-carb stand-in for beans and lentils.' },
+    { foodId: 'cauliflower', ratio: '1:1 by weight', gramRatio: 1, note: 'Low-carb bulk for soups and bowls.' },
+  ],
+  starch: [
+    { foodId: 'cauliflower', ratio: '1:1', gramRatio: 1, note: 'Roasted or mashed cauliflower replaces starchy vegetables.' },
+  ],
+  high_carb_fruit: [
+    { foodId: 'strawberries', ratio: '1:1', gramRatio: 1, note: 'Lower-sugar berries keep the sweetness and vitamin C.' },
+    { foodId: null, ratio: 'omit', gramRatio: 0, note: 'Leave it out.' },
   ],
 };
 
@@ -276,7 +382,7 @@ const SUPPLEMENTS = [
   { id: 'vitaminA', label: 'Vitamin A', fatSoluble: true },
   { id: 'vitaminE', label: 'Vitamin E', fatSoluble: true },
   { id: 'vitaminK', label: 'Vitamin K2', fatSoluble: true },
-  { id: 'omega3', label: 'Omega-3 fish oil', fatSoluble: true },
+  { id: 'omega3', label: 'Omega-3 (fish or algae oil)', fatSoluble: true },
   { id: 'multivitamin', label: 'Multivitamin', fatSoluble: true },
   { id: 'iron', label: 'Iron' },
   { id: 'vitaminC', label: 'Vitamin C' },
@@ -349,11 +455,14 @@ const OCR_SAMPLES = [
 ];
 
 const DEFAULT_PROFILE = {
-  units: 'imperial', age: 32, gender: 'female', heightCm: 167.64, weightKg: 68.04,
-  activity: 'moderate', goal: 'maintain', allergies: [], bodyFatPct: null, waistCm: null, hipCm: null, updatedAt: null,
+  units: 'imperial', age: null, sex: 'female', heightCm: null, weightKg: null,
+  activity: 'moderate', goal: 'maintain', timelineWeeks: 12, diet: 'omnivore', allergies: [],
+  bodyFatPct: null, waistCm: null, hipCm: null, leanMassKg: null,
+  onboarded: false, onboardingStep: 1, updatedAt: null,
 };
 const DEFAULT_SUPPLEMENTS = { selected: ['vitaminD3', 'iron', 'magnesium'], coffeeAtBreakfast: true };
 const DEFAULT_GROCERY = { household: 1, checked: [] };
+const DEFAULT_UI = { tab: 'tab-dashboard' };
 
 /* =========================================================
  * 2. Utilities & Storage
@@ -382,8 +491,8 @@ const todayKey = () => DAYS[(new Date().getDay() + 6) % 7];
 
 /**
  * localStorage wrapper. User data keys are namespaced per signed-in account
- * ("ubecafe.user:<email>.plan"); guests use the bare keys. Device-wide keys
- * (theme, account registry, session) are never namespaced.
+ * ("ubecafe.user:<email>.plan"). Device-wide keys (theme, account registry,
+ * session) are never namespaced.
  */
 const Storage = {
   KEYS: {
@@ -392,6 +501,7 @@ const Storage = {
     plan: 'ubecafe.plan',
     supplements: 'ubecafe.supplements',
     grocery: 'ubecafe.grocery',
+    ui: 'ubecafe.ui',
     theme: 'ubecafe.theme',
     accounts: 'ubecafe.accounts',
     session: 'ubecafe.session',
@@ -402,13 +512,15 @@ const Storage = {
   resolve(key) {
     return this.scope && !this.GLOBAL_KEYS.has(key) ? key.replace('ubecafe.', `ubecafe.user:${this.scope}.`) : key;
   },
+  /** Returns the stored value, or a deep copy of `fallback` so shared defaults are never mutated. */
   load(key, fallback) {
     try {
       const raw = localStorage.getItem(this.resolve(key));
-      return raw ? JSON.parse(raw) : fallback;
+      if (raw) return JSON.parse(raw);
     } catch {
-      return fallback;
+      /* Storage blocked or corrupt: use the fallback. */
     }
+    return structuredClone(fallback);
   },
   save(key, value) {
     try {
@@ -442,22 +554,32 @@ const announce = (message) => {
   window.setTimeout(() => { region.textContent = message; }, 50);
 };
 
+
 /* =========================================================
- * 3. BiometricsEngine
+ * 3. NutritionEngine – energy, macro, micro and body-composition targets
  * ======================================================= */
 
-class BiometricsEngine {
+class NutritionEngine {
   static ACTIVITY_FACTORS = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, athlete: 1.9 };
 
   static GOALS = {
-    loss: { calorieFactor: 0.8, proteinPerKg: 1.8, fatShare: 0.3 },
-    maintain: { calorieFactor: 1, proteinPerKg: 1.4, fatShare: 0.3 },
-    gain: { calorieFactor: 1.1, proteinPerKg: 2.0, fatShare: 0.25 },
+    loss: { label: 'Weight loss', proteinPerKg: 1.8, fatShare: 0.3 },
+    maintain: { label: 'Maintenance', proteinPerKg: 1.4, fatShare: 0.3 },
+    gain: { label: 'Muscle gain', proteinPerKg: 2.0, fatShare: 0.25 },
   };
 
+  /** Shorter timelines use a larger (but capped) energy adjustment. */
+  static TIMELINES = [4, 8, 12, 16, 24];
+
+  static pace(weeks) {
+    if (weeks <= 8) return { label: 'Accelerated', loss: 0.75, gain: 1.15 };
+    if (weeks <= 12) return { label: 'Moderate', loss: 0.8, gain: 1.1 };
+    return { label: 'Gradual', loss: 0.85, gain: 1.05 };
+  }
+
   /** Mifflin-St Jeor: 10·kg + 6.25·cm − 5·age + s (s = +5 male, −161 female, −78 averaged). */
-  static bmr({ weightKg, heightCm, age, gender }) {
-    const sexOffset = { male: 5, female: -161, other: -78 }[gender];
+  static bmr({ weightKg, heightCm, age, sex }) {
+    const sexOffset = { male: 5, female: -161, other: -78 }[sex];
     return 10 * weightKg + 6.25 * heightCm - 5 * age + sexOffset;
   }
 
@@ -465,30 +587,44 @@ class BiometricsEngine {
     const bmr = this.bmr(profile);
     const tdee = bmr * this.ACTIVITY_FACTORS[profile.activity];
     const goal = this.GOALS[profile.goal];
-    const calorieFloor = profile.gender === 'male' ? 1500 : 1200;
-    const calories = Math.max(calorieFloor, Math.round(tdee * goal.calorieFactor));
+    const pace = this.pace(profile.timelineWeeks);
+    const factor = profile.goal === 'maintain' ? 1 : pace[profile.goal];
+    const calorieFloor = profile.sex === 'male' ? 1500 : 1200;
+    const calories = Math.max(calorieFloor, Math.round(tdee * factor));
     const protein = Math.round(profile.weightKg * goal.proteinPerKg);
-    const fat = Math.round((calories * goal.fatShare) / 9);
-    const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
-    const sugar = Math.round((calories * 0.1) / 4); // WHO: free sugars < 10 % of energy
 
+    // Keto caps net carbs at 30 g and fills the remaining energy with fat.
+    let carbs;
+    let fat;
+    if (profile.diet === 'keto') {
+      carbs = 30;
+      fat = Math.max(0, Math.round((calories - protein * 4 - carbs * 4) / 9));
+    } else {
+      fat = Math.round((calories * goal.fatShare) / 9);
+      carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
+    }
+    const sugar = Math.min(carbs, Math.round((calories * 0.1) / 4)); // WHO: free sugars < 10 % of energy
+
+    // ~7,700 kcal per kg of body weight change.
+    const weeklyKg = ((calories - tdee) * 7) / 7700;
     return {
       bmr: Math.round(bmr),
       tdee: Math.round(tdee),
+      pace: profile.goal === 'maintain' ? null : pace.label,
+      projectedKg: profile.goal === 'maintain' ? 0 : weeklyKg * profile.timelineWeeks,
       targets: {
         calories, protein, carbs, fat, sugar,
         fiber: Math.round((14 * calories) / 1000), // IOM: 14 g per 1,000 kcal
-        ...this.micronutrientRDA(profile.age, profile.gender),
+        ...this.micronutrientRDA(profile.age, profile.sex),
       },
     };
   }
 
   /**
-   * Optional body-composition indicators (WHO cut-offs).
-   * BMI always; waist-to-hip and waist-to-height when tape measurements exist;
-   * lean mass and Katch-McArdle BMR when body fat % is known.
+   * Body-composition indicators (WHO cut-offs). BMI always; waist ratios when tape
+   * measurements exist; lean mass from direct entry or body fat %, plus Katch-McArdle BMR.
    */
-  static bodyComposition({ heightCm, weightKg, gender, bodyFatPct, waistCm, hipCm }) {
+  static bodyComposition({ heightCm, weightKg, sex, bodyFatPct, waistCm, hipCm, leanMassKg }) {
     const bmi = weightKg / (heightCm / 100) ** 2;
     let bmiCategory = 'Obesity';
     if (bmi < 18.5) bmiCategory = 'Underweight';
@@ -497,7 +633,7 @@ class BiometricsEngine {
 
     const result = { bmi, bmiCategory };
     if (waistCm && hipCm) {
-      const whrLimit = { male: 0.9, female: 0.85, other: 0.875 }[gender];
+      const whrLimit = { male: 0.9, female: 0.85, other: 0.875 }[sex];
       result.waistToHip = waistCm / hipCm;
       result.waistToHipRisk = result.waistToHip >= whrLimit ? 'Increased risk' : 'Low risk';
       result.waistToHipLimit = whrLimit;
@@ -506,15 +642,17 @@ class BiometricsEngine {
       result.waistToHeight = waistCm / heightCm;
       result.waistToHeightRisk = result.waistToHeight >= 0.5 ? 'Increased risk' : 'Low risk';
     }
-    if (bodyFatPct) {
-      result.leanMassKg = weightKg * (1 - bodyFatPct / 100);
-      result.katchBmr = 370 + 21.6 * result.leanMassKg;
+    const lean = leanMassKg ?? (bodyFatPct ? weightKg * (1 - bodyFatPct / 100) : null);
+    if (lean) {
+      result.leanMassKg = lean;
+      result.leanSource = leanMassKg ? 'Entered' : `From ${fmt(bodyFatPct)}% body fat`;
+      result.katchBmr = 370 + 21.6 * lean;
     }
     return result;
   }
 
   /** NIH Dietary Reference Intakes (RDA / AI) by age and sex. */
-  static micronutrientRDA(age, gender) {
+  static micronutrientRDA(age, sex) {
     const teen = age < 19;
     const senior = age > 70;
     const over50 = age > 50;
@@ -529,17 +667,17 @@ class BiometricsEngine {
       calcium: teen ? 1300 : over50 ? 1200 : 1000, iron: teen ? 15 : over50 ? 8 : 18, potassium: teen ? 2300 : 2600,
       magnesium: teen ? 360 : under31 ? 310 : 320, zinc: teen ? 9 : 8, omega3: 1.1,
     };
-    if (gender === 'male') return male;
-    if (gender === 'female') return female;
+    if (sex === 'male') return male;
+    if (sex === 'female') return female;
     return Object.fromEntries(Object.keys(male).map((k) => [k, Math.round(((male[k] + female[k]) / 2) * 10) / 10]));
   }
 }
 
 /* =========================================================
- * 4. RecipeParser
+ * 4. RecipeManager – recipe text + ingredient parsing and nutrition analysis
  * ======================================================= */
 
-class RecipeParser {
+class RecipeManager {
   static #cache = new WeakMap();
 
   /** Converts "1 1/2", "3/4" or "2.5" into a number. */
@@ -677,56 +815,69 @@ class RecipeParser {
   }
 }
 
+
 /* =========================================================
- * 4b. AllergenGuard – detection and hard-exclusion substitution
+ * 5. SubstitutionEngine – allergen & diet screening with safe swaps
  * ======================================================= */
 
-class AllergenGuard {
+class SubstitutionEngine {
   static #cache = new WeakMap();
 
-  /** Allergens in one parsed ingredient: dictionary tags, else keyword scan. */
-  static detect(ingredient) {
-    if (ingredient.foodId) return FOOD_DB[ingredient.foodId].allergens;
-    const name = ` ${ingredient.name.toLowerCase().replace(/[^a-z\s]/g, ' ')} `;
-    return ALLERGENS.filter((a) => ALLERGEN_KEYWORD_PATTERNS[a.id].test(name)).map((a) => a.id);
+  /** Active restriction ids for a profile: chosen allergies plus the diet's exclusions. */
+  static restrictionsFor(profile) {
+    return [...new Set([...profile.allergies, ...DIETS[profile.diet].excludes])];
   }
 
-  /** A substitute that is itself free of every active allergen, preferring food-specific options. */
-  static pickSubstitute(allergen, foodId, allergies) {
-    const options = ALLERGY_SUBSTITUTES[allergen] ?? [];
-    const isSafe = (option) => !FOOD_DB[option.foodId].allergens.some((a) => allergies.includes(a));
+  /** Restrictions an ingredient violates: dictionary tags, else keyword scan. */
+  static detect(ingredient) {
+    if (ingredient.foodId) return FOOD_DB[ingredient.foodId].tags;
+    const name = ` ${ingredient.name.toLowerCase().replace(/[^a-z\s]/g, ' ')} `;
+    return Object.keys(RESTRICTION_PATTERNS).filter((id) => RESTRICTION_PATTERNS[id].test(name));
+  }
+
+  /** A substitute free of every active restriction, preferring food-specific options. */
+  static pickSubstitute(restriction, foodId, active) {
+    const options = SUBSTITUTES[restriction] ?? [];
+    const isSafe = (option) => option.foodId === null || !FOOD_DB[option.foodId].tags.some((t) => active.includes(t));
     return options.find((o) => o.replaces?.includes(foodId) && isSafe(o))
       ?? options.find((o) => !o.replaces && isSafe(o))
       ?? null;
   }
 
   /**
-   * Returns the recipe analysis with every allergen ingredient swapped for a safe
-   * substitute. `isSafe` is false when any allergen has no safe substitute; such
-   * recipes are excluded from the plan, dashboard and grocery list.
+   * Screens a recipe for a profile. Every violating ingredient is swapped for a safe
+   * substitute (or omitted). `isSafe` is false when an allergen has no safe option;
+   * such recipes are excluded from the planner, dashboard and grocery list.
    */
-  static filterRecipeForUser(recipe, allergies) {
-    const analysis = RecipeParser.analyze(recipe);
-    if (!allergies.length) return { ...analysis, isSafe: true, flagged: [] };
+  static screen(recipe, profile) {
+    const analysis = RecipeManager.analyze(recipe);
+    const active = this.restrictionsFor(profile);
+    if (!active.length) return { ...analysis, isSafe: true, flagged: [] };
 
-    const key = [...allergies].sort().join('|');
-    const byAllergies = this.#cache.get(recipe) ?? new Map();
-    this.#cache.set(recipe, byAllergies);
-    if (byAllergies.has(key)) return byAllergies.get(key);
+    const key = [...active].sort().join('|');
+    const byKey = this.#cache.get(recipe) ?? new Map();
+    this.#cache.set(recipe, byKey);
+    if (byKey.has(key)) return byKey.get(key);
 
     const flagged = [];
     const ingredients = analysis.ingredients.map((ing) => {
-      const hits = this.detect(ing).filter((a) => allergies.includes(a));
+      const hits = this.detect(ing).filter((t) => active.includes(t));
       if (!hits.length) return ing;
       const original = ing.foodId ? FOOD_DB[ing.foodId].name : ing.name;
-      const sub = hits.map((a) => this.pickSubstitute(a, ing.foodId, allergies)).find(Boolean) ?? null;
+      const sub = hits.map((t) => this.pickSubstitute(t, ing.foodId, active)).find(Boolean) ?? null;
       flagged.push({
         raw: ing.raw,
         original,
-        allergens: hits,
-        substitute: sub && { name: FOOD_DB[sub.foodId].name, ratio: sub.ratio, note: sub.note },
+        hits,
+        isAllergy: hits.some((t) => profile.allergies.includes(t)),
+        substitute: sub && {
+          name: sub.foodId ? FOOD_DB[sub.foodId].name : 'Omit',
+          ratio: sub.ratio,
+          note: sub.note,
+        },
       });
       if (!sub) return { ...ing, blocked: true, nutrients: emptyNutrients() };
+      if (sub.foodId === null) return { ...ing, omitted: true, grams: 0, nutrients: emptyNutrients(), swappedFrom: original };
       const grams = ing.grams * sub.gramRatio;
       return {
         ...ing,
@@ -746,43 +897,56 @@ class AllergenGuard {
       isSafe: flagged.every((f) => f.substitute),
       flagged,
     };
-    byAllergies.set(key, result);
+    byKey.set(key, result);
     return result;
   }
 
-  /** Accessible allergen badge (icon + text, never color alone). */
-  static badge(allergens, level = 'warn') {
-    const labels = allergens.map((a) => ALLERGEN_BY_ID[a].label).join(', ');
-    return `<span class="badge badge--${level}"><span aria-hidden="true">${level === 'danger' ? '✕' : '!'}</span><span class="sr-only">Allergen warning:</span> ${labels}</span>`;
+  /** Accessible restriction badge: icon + text + screen-reader prefix, never color alone. */
+  static badge(hits, { isAllergy = true, blocked = false } = {}) {
+    const labels = hits.map((t) => RESTRICTIONS[t].label).join(', ');
+    const level = blocked ? 'danger' : 'warn';
+    return `<span class="badge badge--${level}"><span aria-hidden="true">${blocked ? '✕' : '!'}</span><span class="sr-only">${isAllergy ? 'Allergen warning:' : 'Diet conflict:'}</span> ${labels}</span>`;
   }
 }
 
 /* =========================================================
- * 5. RecommendationEngine – explicit if/else rules
+ * 6. RecommendationEngine – explicit if/else rules
  * ======================================================= */
 
 class RecommendationEngine {
-  /** Allergens carried by foods named in recommendations. */
-  static FOOD_ALLERGENS = {
-    'Oats with Nut Butter': ['gluten', 'peanuts', 'tree_nuts'],
+  /** Restriction tags for foods named in recommendations (unlisted foods are unrestricted). */
+  static FOOD_RESTRICTIONS = {
+    'Oats with Nut Butter': ['grains', 'gluten', 'peanuts', 'tree_nuts', 'legumes'],
     'Greek Yogurt': ['dairy'],
     'Cottage Cheese': ['dairy'],
     'Plain Yogurt': ['dairy'],
     'Fortified Milk': ['dairy'],
+    'Fortified Oat Milk': ['grains'],
+    'Fortified Soy Milk': ['soy', 'legumes'],
     Eggs: ['eggs'],
-    'Firm Tofu': ['soy'],
+    'Firm Tofu': ['soy', 'legumes'],
     Almonds: ['tree_nuts'],
     Walnuts: ['tree_nuts'],
+    'Chicken Breast': ['meat'],
+    'Lean Beef': ['meat'],
+    Salmon: ['fish'],
+    Sardines: ['fish'],
+    'Canned Tuna': ['fish'],
+    Lentils: ['legumes'],
+    'Black Beans': ['legumes'],
+    Chickpeas: ['legumes'],
+    Banana: ['high_carb_fruit'],
+    'Sweet Potato': ['starch'],
   };
 
-  /** Removes foods containing active allergens; returns the safe names and the ones left out. */
-  static safeFoods(foodList, allergies) {
+  /** Removes foods that clash with active restrictions; returns the safe names and the ones left out. */
+  static safeFoods(foodList, restrictions) {
     const names = foodList.split(' / ');
-    const isSafe = (name) => !(this.FOOD_ALLERGENS[name] ?? []).some((a) => allergies.includes(a));
+    const isSafe = (name) => !(this.FOOD_RESTRICTIONS[name] ?? []).some((t) => restrictions.includes(t));
     return { safe: names.filter(isSafe), removed: names.filter((n) => !isSafe(n)) };
   }
 
-  static recommend(intake, targets, mealsPlanned, allergies = []) {
+  static recommend(intake, targets, mealsPlanned, restrictions = []) {
     if (mealsPlanned === 0) {
       return [{
         food: 'Plan your first meal',
@@ -794,16 +958,16 @@ class RecommendationEngine {
 
     const recs = [];
     const ratio = (key) => (targets[key] > 0 ? intake[key] / targets[key] : 1);
-    /** Adds a rule's output, swapping in `alternative` foods when every option conflicts with an allergy. */
+    /** Adds a rule's output, swapping in `alternative` foods when every option clashes with a restriction. */
     const add = (key, foods, reason, alternative) => {
-      let { safe, removed } = this.safeFoods(foods, allergies);
-      if (!safe.length && alternative) safe = this.safeFoods(alternative, allergies).safe;
+      let { safe, removed } = this.safeFoods(foods, restrictions);
+      if (!safe.length && alternative) safe = this.safeFoods(alternative, restrictions).safe;
       if (!safe.length) return;
       const r = ratio(key);
       recs.push({
         food: safe.join(' / '),
         reason,
-        allergyNote: removed.length ? `Adjusted for your allergies: left out ${removed.join(', ')}.` : '',
+        restrictionNote: removed.length ? `Adjusted for your diet and allergies: left out ${removed.join(', ')}.` : '',
         trigger: `${NUTRIENT_BY_KEY[key].label} at ${Math.round(r * 100)}% of ${NUTRIENT_BY_KEY[key].isLimit ? 'your daily limit' : 'target'}`,
         priority: r < 0.5 || r > 1.25 ? 'high' : 'medium',
       });
@@ -820,7 +984,7 @@ class RecommendationEngine {
     if (ratio('protein') < 0.8 && intake.carbs >= targets.carbs) {
       add('protein', 'Greek Yogurt / Cottage Cheese', 'High-protein, low-carb boost to meet muscle protein synthesis targets.', 'Hemp Seeds / Canned Tuna');
     } else if (ratio('protein') < 0.8) {
-      add('protein', 'Chicken Breast / Eggs / Firm Tofu', 'Complete protein sources that close your protein deficit while leaving room for the carbohydrates you still need.');
+      add('protein', 'Chicken Breast / Eggs / Firm Tofu', 'Complete protein sources that close your protein deficit while leaving room for the carbohydrates you still need.', 'Lentils / Hemp Seeds');
     }
 
     // Limits
@@ -842,10 +1006,10 @@ class RecommendationEngine {
       add('vitaminC', 'Red Bell Pepper / Kiwi / Strawberries', 'Vitamin C supports immunity and multiplies non-heme iron absorption when eaten in the same meal.');
     }
     if (ratio('vitaminD') < 0.7) {
-      add('vitaminD', 'Salmon / Sardines / Fortified Milk', 'Few foods contain vitamin D; oily fish and fortified dairy are the most reliable dietary sources.');
+      add('vitaminD', 'Salmon / Sardines / Fortified Milk', 'Few foods contain vitamin D; oily fish and fortified dairy are the most reliable dietary sources.', 'Fortified Oat Milk / UV-Exposed Mushrooms');
     }
     if (ratio('vitaminB12') < 0.7) {
-      add('vitaminB12', 'Eggs / Salmon / Greek Yogurt', 'B12 is found almost only in animal foods and is essential for nerve function and red blood cells.');
+      add('vitaminB12', 'Eggs / Salmon / Greek Yogurt', 'B12 is found almost only in animal foods and fortified products, and is essential for nerve function and red blood cells.', 'Nutritional Yeast / Fortified Soy Milk');
     }
     if (ratio('calcium') < 0.7) {
       add('calcium', 'Greek Yogurt / Kale / Firm Tofu', 'Calcium-rich foods protect bone density; calcium-set tofu and kale are strong dairy-free options.');
@@ -879,8 +1043,9 @@ class RecommendationEngine {
   }
 }
 
+
 /* =========================================================
- * 6. ScheduleOptimizer – supplement timing rules
+ * 7. ScheduleOptimizer – supplement timing rules
  * ======================================================= */
 
 class ScheduleOptimizer {
@@ -973,12 +1138,12 @@ class ScheduleOptimizer {
 }
 
 /* =========================================================
- * 7. GroceryAggregator
+ * 8. GroceryAggregator
  * ======================================================= */
 
 class GroceryAggregator {
   /**
-   * @param {(recipe) => {isSafe: boolean, ingredients: Array}} analyze – allergy-aware analyzer;
+   * @param {(recipe) => {isSafe: boolean, ingredients: Array}} analyze – restriction-aware analyzer;
    *   unsafe recipes are skipped and substituted ingredients are bought instead of the originals.
    */
   static aggregate(plan, recipesById, household, supplementIds, analyze) {
@@ -991,6 +1156,7 @@ class GroceryAggregator {
       if (!analysis.isSafe) return;
       const factor = household / Math.max(1, recipe.servings);
       analysis.ingredients.forEach((ing) => {
+        if (ing.omitted) return;
         if (ing.foodId) {
           const food = FOOD_DB[ing.foodId];
           const entry = items.get(food.id) ?? { key: food.id, name: food.name, aisle: food.aisle, grams: 0, food, replaces: new Set() };
@@ -1036,16 +1202,15 @@ class GroceryAggregator {
 }
 
 /* =========================================================
- * 8. AccountManager – local, per-device user accounts
+ * 9. AuthManager – local, per-device accounts
  *
- * Accounts let several people share one browser with separate profiles,
- * recipes and plans. Credentials never leave the device: each password is
- * salted and stretched with PBKDF2-SHA-256 (Web Crypto) and only the hash is
- * stored. This is privacy separation, not server-grade security: anyone with
- * access to the browser's storage can read the (unencrypted) nutrition data.
+ * Credentials never leave the device: each password is salted and stretched
+ * with PBKDF2-SHA-256 (Web Crypto) and only the hash is stored. This separates
+ * people who share a browser; it is not server-grade security, because anyone
+ * with access to the browser's storage can read the (unencrypted) meal data.
  * ======================================================= */
 
-class AccountManager {
+class AuthManager {
   static ITERATIONS = 210000; // OWASP 2023 recommendation for PBKDF2-HMAC-SHA256
 
   static normalize(email) {
@@ -1054,6 +1219,10 @@ class AccountManager {
 
   static registry() {
     return Storage.load(Storage.KEYS.accounts, {});
+  }
+
+  static account(email) {
+    return this.registry()[email] ?? null;
   }
 
   static toBase64(buffer) {
@@ -1065,42 +1234,48 @@ class AccountManager {
   }
 
   static async derive(password, salt, iterations) {
+    if (!window.crypto?.subtle) throw new Error('unsupported');
     const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
     const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256);
     return this.toBase64(bits);
   }
 
-  /**
-   * Signs in to an existing account (verifying the password) or creates a new one.
-   * @returns {Promise<{email: string, created: boolean}>}
-   * @throws {Error} message 'unsupported' | 'wrong-password'
-   */
-  static async signInOrCreate(rawEmail, password) {
-    if (!window.crypto?.subtle) throw new Error('unsupported');
+  /** @throws {Error} 'exists' | 'unsupported' */
+  static async register(fullName, rawEmail, password) {
     const email = this.normalize(rawEmail);
     const accounts = this.registry();
-    const existing = accounts[email];
-
-    if (existing) {
-      const hash = await this.derive(password, this.fromBase64(existing.salt), existing.iterations);
-      if (hash !== existing.hash) throw new Error('wrong-password');
-      return { email, created: false };
-    }
-
+    if (accounts[email]) throw new Error('exists');
     const salt = crypto.getRandomValues(new Uint8Array(16));
     accounts[email] = {
+      fullName: fullName.trim(),
       salt: this.toBase64(salt),
       hash: await this.derive(password, salt, this.ITERATIONS),
       iterations: this.ITERATIONS,
       createdAt: new Date().toISOString(),
     };
     Storage.save(Storage.KEYS.accounts, accounts);
-    return { email, created: true };
+    Storage.save(Storage.KEYS.session, email);
+    return email;
+  }
+
+  /** @throws {Error} 'invalid' | 'unsupported' (one message for unknown email or wrong password) */
+  static async signIn(rawEmail, password) {
+    const email = this.normalize(rawEmail);
+    const existing = this.account(email);
+    if (!existing) throw new Error('invalid');
+    const hash = await this.derive(password, this.fromBase64(existing.salt), existing.iterations);
+    if (hash !== existing.hash) throw new Error('invalid');
+    Storage.save(Storage.KEYS.session, email);
+    return email;
   }
 
   static restoreSession() {
     const email = Storage.load(Storage.KEYS.session, null);
-    return email && this.registry()[email] ? email : null;
+    return email && this.account(email) ? email : null;
+  }
+
+  static signOut() {
+    Storage.remove(Storage.KEYS.session);
   }
 
   static deleteAccount(email) {
@@ -1108,43 +1283,45 @@ class AccountManager {
     delete accounts[email];
     Storage.save(Storage.KEYS.accounts, accounts);
     Storage.removeScope(email);
+    this.signOut();
   }
 }
 
 /* =========================================================
- * 9. Application state & UI controllers
+ * 10. Application state & UI controllers
  * ======================================================= */
 
-/** Reads the active scope's (guest or account) data, falling back to seeds. */
+const state = {
+  account: null,
+  profile: { ...DEFAULT_PROFILE },
+  recipes: [],
+  plan: {},
+  supplements: DEFAULT_SUPPLEMENTS,
+  grocery: DEFAULT_GROCERY,
+  ui: DEFAULT_UI,
+  viewDay: todayKey(),
+};
+
+/** Reads the signed-in account's data, falling back to defaults and the sample library. */
 const loadUserData = () => ({
   profile: { ...DEFAULT_PROFILE, ...Storage.load(Storage.KEYS.profile, {}) },
   recipes: Storage.load(Storage.KEYS.recipes, SEED_RECIPES),
   plan: Storage.load(Storage.KEYS.plan, SEED_PLAN),
   supplements: Storage.load(Storage.KEYS.supplements, DEFAULT_SUPPLEMENTS),
   grocery: Storage.load(Storage.KEYS.grocery, DEFAULT_GROCERY),
+  ui: Storage.load(Storage.KEYS.ui, DEFAULT_UI),
 });
 
-/** Writes all user data to the active scope (used when a new account adopts guest data). */
-const saveUserData = () => {
-  ['profile', 'recipes', 'plan', 'supplements', 'grocery'].forEach((key) => Storage.save(Storage.KEYS[key], state[key]));
-};
-
-const state = {
-  ...loadUserData(),
-  viewDay: todayKey(),
-  editingId: null,
-};
-
 const recipesById = () => new Map(state.recipes.map((r) => [r.id, r]));
-const currentTargets = () => BiometricsEngine.calculate(state.profile);
-
-/** Returns each slot's planned recipe and per-serving nutrients for a day. */
-/** Recipe analysis with the active user's allergy substitutions applied. */
-const analyzeForUser = (recipe) => AllergenGuard.filterRecipeForUser(recipe, state.profile.allergies);
+const currentTargets = () => NutritionEngine.calculate(state.profile);
+const analyzeForUser = (recipe) => SubstitutionEngine.screen(recipe, state.profile);
+const firstName = () => state.account.fullName.split(/\s+/)[0];
+const round1 = (n) => Math.round(n * 10) / 10;
+const KG_PER_LB = 0.45359237;
 
 /**
- * Returns each slot's planned recipe and per-serving nutrients for a day.
- * Recipes that cannot be made allergy-safe are marked `blocked` and contribute nothing.
+ * Each slot's planned recipe and per-serving nutrients for a day. Recipes that
+ * cannot be made safe are marked `blocked` and contribute nothing.
  */
 const mealsForDay = (day) => {
   const byId = recipesById();
@@ -1161,223 +1338,777 @@ const mealsForDay = (day) => {
   }));
 };
 
-/* ---------- Profile & targets ---------- */
+/** Restriction ids that have no safe substitute in a screened recipe. */
+const blockedHits = (flagged) => [...new Set(flagged.filter((f) => !f.substitute).flatMap((f) => f.hits))];
 
-const ProfileUI = {
-  form: null,
-  /** Tape-measure limits per unit system (waist & hip share the same range). */
-  LENGTH_LIMITS: { metric: { min: 40, max: 200, step: 0.1, label: 'cm' }, imperial: { min: 16, max: 80, step: 0.1, label: 'in' } },
+/* ---------- Accessible tabs (WAI-ARIA tabs pattern, automatic activation) ---------- */
+
+class Tabs {
+  constructor(tablist, { onChange } = {}) {
+    this.tabs = [...tablist.querySelectorAll('[role="tab"]')];
+    this.onChange = onChange;
+    tablist.addEventListener('click', (e) => {
+      const tab = e.target.closest('[role="tab"]');
+      if (tab) this.select(tab.id);
+    });
+    tablist.addEventListener('keydown', (e) => {
+      const index = this.tabs.indexOf(document.activeElement);
+      const targets = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: this.tabs.length - 1 };
+      if (index < 0 || !(e.key in targets)) return;
+      e.preventDefault();
+      const next = this.tabs[(targets[e.key] + this.tabs.length) % this.tabs.length];
+      this.select(next.id, { focus: true });
+    });
+  }
+
+  select(id, { focus = false } = {}) {
+    const known = this.tabs.some((tab) => tab.id === id) ? id : this.tabs[0].id;
+    this.tabs.forEach((tab) => {
+      const selected = tab.id === known;
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      document.getElementById(tab.getAttribute('aria-controls')).hidden = !selected;
+      if (selected && focus) tab.focus();
+    });
+    this.onChange?.(known);
+  }
+}
+
+/** Sets or clears an inline field error wired through aria-describedby. */
+const setFieldError = (input, message) => {
+  input.setAttribute('aria-invalid', String(Boolean(message)));
+  document.getElementById(`${input.id}-error`).textContent = message;
+};
+
+/* ---------- Auth view ---------- */
+
+const AuthView = {
+  tabs: null,
 
   init() {
-    this.form = $('#profile-form');
-    $('#allergy-options').innerHTML = ALLERGENS.map((a) => `
-      <div class="check">
-        <input type="checkbox" id="allergy-${a.id}" name="allergy" value="${a.id}">
-        <label for="allergy-${a.id}">${a.option}</label>
-      </div>`).join('');
-    this.fill(state.profile);
-    this.form.addEventListener('change', (e) => {
-      if (e.target.name === 'units') this.switchUnits(e.target.value);
-      if (e.target.name === 'allergy') this.applyAllergies();
-    });
-    this.form.addEventListener('submit', (e) => {
+    this.tabs = new Tabs($('#auth-tablist'));
+    $('#signin-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      this.submit();
+      this.signIn();
+    });
+    $('#signup-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.signUp();
+    });
+    document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const input = document.getElementById(button.getAttribute('aria-controls'));
+        const show = button.getAttribute('aria-pressed') !== 'true';
+        input.type = show ? 'text' : 'password';
+        button.setAttribute('aria-pressed', String(show));
+      });
     });
   },
 
-  fill(profile) {
-    const f = this.form.elements;
-    const toLength = (cm) => (cm ? Math.round((profile.units === 'metric' ? cm : cm / 2.54) * 10) / 10 : '');
-    f.units.value = profile.units;
-    f.age.value = profile.age;
-    f.gender.value = profile.gender;
-    f.activity.value = profile.activity;
-    f.goal.value = profile.goal;
-    f['height-cm'].value = Math.round(profile.heightCm * 10) / 10;
-    f['weight-kg'].value = Math.round(profile.weightKg * 10) / 10;
-    const totalInches = profile.heightCm / 2.54;
-    f['height-ft'].value = Math.floor(totalInches / 12);
-    f['height-in'].value = Math.round((totalInches % 12) * 10) / 10;
-    f['weight-lb'].value = Math.round((profile.weightKg / 0.45359237) * 10) / 10;
-    f['body-fat'].value = profile.bodyFatPct ?? '';
-    this.form.querySelectorAll('input[name="allergy"]').forEach((box) => { box.checked = profile.allergies.includes(box.value); });
-    f.waist.value = toLength(profile.waistCm);
-    f.hip.value = toLength(profile.hipCm);
-    this.toggleUnitFields(profile.units);
-    this.renderSavedNote(profile);
+  reset() {
+    ['#signin-form', '#signup-form'].forEach((sel) => {
+      const form = $(sel);
+      form.reset();
+      form.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
+      form.querySelectorAll('.field-error, .form-error').forEach((el) => { el.textContent = ''; });
+      form.querySelectorAll('[data-password-toggle]').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+      form.querySelectorAll('input[type="text"][id$="password"]').forEach((i) => { i.type = 'password'; });
+    });
+    this.tabs.select('tab-signin');
   },
 
-  toggleUnitFields(units) {
-    this.form.querySelectorAll('[data-units]').forEach((group) => {
-      group.hidden = group.dataset.units !== units;
+  /** Validates fields; returns the first invalid input or null. */
+  validate(checks) {
+    let first = null;
+    checks.forEach(([input, ok, message]) => {
+      setFieldError(input, ok ? '' : message);
+      if (!ok && !first) first = input;
     });
-    const limits = this.LENGTH_LIMITS[units];
-    this.form.querySelectorAll('[data-length]').forEach((input) => {
-      Object.assign(input, { min: limits.min, max: limits.max, step: limits.step });
-    });
-    this.form.querySelectorAll('[data-length-unit]').forEach((el) => { el.textContent = `(${limits.label})`; });
+    return first;
   },
 
-  /** Converts the visible values so switching units never loses data. */
-  switchUnits(units) {
-    const f = this.form.elements;
-    const convertLength = (input, factor) => {
-      if (Number(input.value) > 0) input.value = Math.round(Number(input.value) * factor * 10) / 10;
-    };
-    if (units === 'metric') {
-      const inches = Number(f['height-ft'].value) * 12 + Number(f['height-in'].value);
-      if (inches > 0) f['height-cm'].value = Math.round(inches * 25.4) / 10;
-      if (Number(f['weight-lb'].value) > 0) f['weight-kg'].value = Math.round(Number(f['weight-lb'].value) * 4.5359237) / 10;
-      [f.waist, f.hip].forEach((input) => convertLength(input, 2.54));
-    } else {
-      const cm = Number(f['height-cm'].value);
-      if (cm > 0) {
-        const inches = cm / 2.54;
-        f['height-ft'].value = Math.floor(inches / 12);
-        f['height-in'].value = Math.round((inches % 12) * 10) / 10;
-      }
-      if (Number(f['weight-kg'].value) > 0) f['weight-lb'].value = Math.round((Number(f['weight-kg'].value) / 0.45359237) * 10) / 10;
-      [f.waist, f.hip].forEach((input) => convertLength(input, 1 / 2.54));
+  async withBusy(form, label, task) {
+    const button = form.querySelector('[type="submit"]');
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = label;
+    try {
+      await task();
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
     }
-    this.toggleUnitFields(units);
   },
 
-  /** Validates visible numeric fields; optional fields may be left blank. */
-  validate() {
-    const inputs = [...this.form.querySelectorAll('input[type="number"]')]
-      .filter((input) => !input.closest('[hidden]'));
-    let firstInvalid = null;
-    inputs.forEach((input) => {
-      const error = $(`#${input.id}-error`);
-      const value = Number(input.value);
-      const blankOptional = input.value === '' && !input.required;
-      const valid = blankOptional || (input.value !== '' && value >= Number(input.min) && value <= Number(input.max));
-      input.setAttribute('aria-invalid', String(!valid));
-      error.textContent = valid ? '' : `Enter a number between ${input.min} and ${input.max}${input.required ? '' : ', or leave it blank'}.`;
-      if (!valid && !firstInvalid) firstInvalid = input;
-    });
-    return firstInvalid;
-  },
-
-  submit() {
-    const invalid = this.validate();
+  async signIn() {
+    const email = $('#signin-email');
+    const password = $('#signin-password');
+    $('#signin-error').textContent = '';
+    const invalid = this.validate([
+      [email, email.value.trim() !== '' && email.validity.valid, 'Enter an email address like you@example.com.'],
+      [password, password.value !== '', 'Enter your password.'],
+    ]);
     if (invalid) {
       invalid.focus();
-      announce('Please fix the highlighted fields.');
       return;
     }
-    const f = this.form.elements;
-    const units = f.units.value;
-    const optional = (input, factor = 1) => (input.value === '' ? null : Math.round(Number(input.value) * factor * 10) / 10);
-    const lengthFactor = units === 'metric' ? 1 : 2.54;
-    state.profile = {
-      units,
-      age: Number(f.age.value),
-      gender: f.gender.value,
-      activity: f.activity.value,
-      goal: f.goal.value,
-      heightCm: units === 'metric'
-        ? Number(f['height-cm'].value)
-        : (Number(f['height-ft'].value) * 12 + Number(f['height-in'].value)) * 2.54,
-      weightKg: units === 'metric' ? Number(f['weight-kg'].value) : Number(f['weight-lb'].value) * 0.45359237,
-      allergies: this.readAllergies(),
-      bodyFatPct: optional(f['body-fat']),
-      waistCm: optional(f.waist, lengthFactor),
-      hipCm: optional(f.hip, lengthFactor),
-      updatedAt: new Date().toISOString(),
-    };
-    Storage.save(Storage.KEYS.profile, state.profile);
-    this.renderSavedNote(state.profile);
-    App.renderNutrition();
-    const where = AccountUI.email ? ` to ${AccountUI.email}` : ' on this device';
-    announce(`Profile saved${where}. Targets updated: ${fmt(currentTargets().targets.calories)} calories per day.`);
+    await this.withBusy($('#signin-form'), 'Signing in…', async () => {
+      try {
+        App.enter(await AuthManager.signIn(email.value, password.value));
+        announce(`Signed in. Welcome back, ${firstName()}.`);
+      } catch (error) {
+        $('#signin-error').textContent = error.message === 'invalid'
+          ? 'That email and password combination was not found. Check both and try again.'
+          : 'Accounts need a secure (https) connection and a modern browser.';
+        password.select();
+        password.focus();
+      }
+    });
   },
 
-  readAllergies() {
-    return [...this.form.querySelectorAll('input[name="allergy"]:checked')].map((box) => box.value);
-  },
-
-  /** Allergy toggles apply immediately: re-screens every recipe, the plan and the grocery list. */
-  applyAllergies() {
-    state.profile = { ...state.profile, allergies: this.readAllergies() };
-    Storage.save(Storage.KEYS.profile, state.profile);
-    App.renderRecipesChanged();
-    const results = state.recipes.map(analyzeForUser);
-    const swapped = results.filter((r) => r.isSafe && r.flagged.length).length;
-    const blocked = results.filter((r) => !r.isSafe).length;
-    const labels = state.profile.allergies.map((a) => ALLERGEN_BY_ID[a].label.toLowerCase());
-    announce(labels.length
-      ? `Allergies set: ${labels.join(', ')}. ${swapped} recipe${swapped === 1 ? '' : 's'} adjusted with safe swaps${blocked ? `, ${blocked} excluded` : ''}.`
-      : 'All allergy filters cleared.');
-  },
-
-  renderSavedNote(profile) {
-    const note = $('#profile-saved');
-    if (!profile.updatedAt) {
-      note.textContent = '';
+  async signUp() {
+    const name = $('#signup-name');
+    const email = $('#signup-email');
+    const password = $('#signup-password');
+    $('#signup-error').textContent = '';
+    const invalid = this.validate([
+      [name, name.value.trim().length >= 2, 'Enter your full name.'],
+      [email, email.value.trim() !== '' && email.validity.valid, 'Enter an email address like you@example.com.'],
+      [password, password.value.length >= 8, 'Use at least 8 characters.'],
+    ]);
+    if (invalid) {
+      invalid.focus();
       return;
     }
-    const when = new Date(profile.updatedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
-    note.textContent = `Last saved ${when}${AccountUI.email ? ` to ${AccountUI.email}` : ' as guest'}.`;
-  },
-
-  renderBodyComposition() {
-    const c = BiometricsEngine.bodyComposition(state.profile);
-    const metric = state.profile.units === 'metric';
-    const rows = [['BMI', fmt(c.bmi), c.bmiCategory]];
-    if (c.waistToHip) rows.push(['Waist-to-hip ratio', c.waistToHip.toFixed(2), `${c.waistToHipRisk} (WHO cut-off ${c.waistToHipLimit})`]);
-    if (c.waistToHeight) rows.push(['Waist-to-height ratio', c.waistToHeight.toFixed(2), `${c.waistToHeightRisk} (cut-off 0.5)`]);
-    if (c.leanMassKg) {
-      const lean = metric ? `${fmt(c.leanMassKg)} kg` : `${fmt(c.leanMassKg / 0.45359237)} lb`;
-      rows.push(['Lean body mass', lean, `From ${fmt(state.profile.bodyFatPct)}% body fat`]);
-      rows.push(['BMR (Katch-McArdle)', `${fmt(c.katchBmr)} kcal`, 'Lean-mass estimate, for comparison']);
-    }
-    return `
-      <div class="table-wrap">
-        <table class="data-table">
-          <caption>Body composition</caption>
-          <thead><tr><th scope="col">Measure</th><th scope="col">Value</th><th scope="col">Interpretation</th></tr></thead>
-          <tbody>${rows.map(([label, value, note]) => `<tr><th scope="row">${label}</th><td>${value}</td><td>${note}</td></tr>`).join('')}</tbody>
-        </table>
-      </div>
-      ${rows.length === 1 ? '<p class="field__hint">Add body fat %, waist and hip measurements for more indicators.</p>' : ''}`;
-  },
-
-  renderTargets() {
-    const { bmr, tdee, targets } = currentTargets();
-    const rows = NUTRIENTS.map((meta) => `
-      <tr>
-        <th scope="row">${meta.label}${meta.isLimit ? ' (max)' : ''}</th>
-        <td>${fmt(targets[meta.key])} ${meta.unit}</td>
-      </tr>`).join('');
-    $('#targets-output').innerHTML = `
-      <div class="stat-row">
-        <p class="stat"><span class="stat__value">${fmt(targets.calories)}</span><span class="stat__label">Daily calories</span></p>
-        <p class="stat"><span class="stat__value">${fmt(bmr)}</span><span class="stat__label">BMR (kcal)</span></p>
-        <p class="stat"><span class="stat__value">${fmt(tdee)}</span><span class="stat__label">TDEE (kcal)</span></p>
-      </div>
-      ${this.renderBodyComposition()}
-      <div class="table-wrap">
-        <table class="data-table">
-          <caption>Your daily nutrition targets</caption>
-          <thead><tr><th scope="col">Nutrient</th><th scope="col">Daily target</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
+    await this.withBusy($('#signup-form'), 'Creating account…', async () => {
+      try {
+        App.enter(await AuthManager.register(name.value, email.value, password.value));
+        announce('Account created. Let’s set up your profile, step 1 of 4.');
+      } catch (error) {
+        if (error.message === 'exists') {
+          setFieldError(email, 'An account with this email already exists. Choose “Sign in” instead.');
+          email.focus();
+        } else {
+          $('#signup-error').textContent = 'Accounts need a secure (https) connection and a modern browser.';
+        }
+      }
+    });
   },
 };
 
-/* ---------- Dashboard ---------- */
+/* ---------- Recipe importer (reused in onboarding and the recipe tab) ---------- */
+
+class RecipeImporter {
+  /**
+   * @param {HTMLElement} root – container to render into
+   * @param {{prefix: string, onSaved: (recipe, isUpdate: boolean) => void}} options
+   */
+  constructor(root, { prefix, onSaved }) {
+    this.p = prefix;
+    this.onSaved = onSaved;
+    this.editingId = null;
+    this.previewUrl = null;
+    root.innerHTML = this.markup();
+    this.bind();
+  }
+
+  el(name) {
+    return document.getElementById(`${this.p}-${name}`);
+  }
+
+  markup() {
+    const p = this.p;
+    return `
+      <div class="two-col">
+        <article class="card" aria-labelledby="${p}-paste-title">
+          <h3 id="${p}-paste-title">Paste recipe text</h3>
+          <div class="field">
+            <label for="${p}-raw">Raw recipe</label>
+            <textarea id="${p}-raw" rows="8" aria-describedby="${p}-raw-hint" placeholder="Title: Morning Oats&#10;Servings: 2&#10;Ingredients:&#10;- 1 cup rolled oats&#10;- 2 cups milk&#10;Instructions:&#10;1. Simmer for 5 minutes."></textarea>
+            <p id="${p}-raw-hint" class="field__hint">Include “Ingredients” and “Instructions” headings. Title and servings lines are optional.</p>
+          </div>
+          <button type="button" id="${p}-parse" class="btn btn--secondary">Parse into form</button>
+        </article>
+        <article class="card" aria-labelledby="${p}-ocr-title">
+          <h3 id="${p}-ocr-title">Scan a recipe photo</h3>
+          <div id="${p}-dropzone" class="dropzone" role="button" tabindex="0" aria-describedby="${p}-ocr-hint">
+            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="32" height="32"><path d="M4 7h3l2-3h6l2 3h3v13H4z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            <span class="dropzone__title">Choose or drop a photo</span>
+          </div>
+          <p id="${p}-ocr-hint" class="field__hint">Simulated OCR for demonstration: your image never leaves this device, and a sample recipe text is extracted.</p>
+          <input type="file" id="${p}-file" accept="image/*" hidden>
+          <label for="${p}-progress" class="sr-only">Text extraction progress</label>
+          <progress id="${p}-progress" class="ocr-progress" max="100" value="0" hidden></progress>
+          <p id="${p}-status" class="ocr-status" role="status" aria-live="polite"></p>
+          <img id="${p}-preview" class="ocr-preview" alt="" hidden>
+        </article>
+      </div>
+      <form id="${p}-form" class="card form recipe-form" novalidate aria-labelledby="${p}-form-title">
+        <h3 id="${p}-form-title">Recipe details</h3>
+        <div class="form__grid form__grid--title">
+          <div class="field">
+            <label for="${p}-title">Title</label>
+            <input type="text" id="${p}-title" autocomplete="off" required aria-describedby="${p}-title-error">
+            <p id="${p}-title-error" class="field-error"></p>
+          </div>
+          <div class="field">
+            <label for="${p}-servings">Servings</label>
+            <input type="number" id="${p}-servings" min="1" max="50" step="1" value="1" inputmode="numeric" required aria-describedby="${p}-servings-error">
+            <p id="${p}-servings-error" class="field-error"></p>
+          </div>
+        </div>
+        <div class="form__grid">
+          <div class="field">
+            <label for="${p}-ingredients">Ingredients <span class="field__hint">(one per line)</span></label>
+            <textarea id="${p}-ingredients" rows="7" required aria-describedby="${p}-ingredients-hint ${p}-ingredients-error"></textarea>
+            <p id="${p}-ingredients-hint" class="field__hint">Examples: “1 1/2 cups rolled oats”, “200 g spinach”, “2 large eggs”.</p>
+            <p id="${p}-ingredients-error" class="field-error"></p>
+          </div>
+          <div class="field">
+            <label for="${p}-instructions">Instructions <span class="field__hint">(optional)</span></label>
+            <textarea id="${p}-instructions" rows="7"></textarea>
+          </div>
+        </div>
+        <div class="button-row">
+          <button type="button" id="${p}-analyze" class="btn btn--secondary">Analyze nutrition</button>
+          <button type="submit" id="${p}-save" class="btn btn--primary">Save recipe</button>
+          <button type="button" id="${p}-cancel" class="btn btn--ghost" hidden>Cancel edit</button>
+        </div>
+        <div id="${p}-analysis" class="analysis" aria-live="polite"></div>
+      </form>`;
+  }
+
+  bind() {
+    this.el('parse').addEventListener('click', () => this.parseRaw());
+    this.el('analyze').addEventListener('click', () => this.renderAnalysis(this.readForm()));
+    this.el('cancel').addEventListener('click', () => this.reset());
+    this.el('form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.save();
+    });
+
+    // Custom drop zone: role="button" with Enter/Space keyboard activation.
+    const zone = this.el('dropzone');
+    const fileInput = this.el('file');
+    zone.addEventListener('click', () => fileInput.click());
+    zone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+    zone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      zone.classList.add('is-dragging');
+    });
+    zone.addEventListener('dragleave', () => zone.classList.remove('is-dragging'));
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.classList.remove('is-dragging');
+      this.handleImage(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => this.handleImage(fileInput.files[0]));
+  }
+
+  readForm() {
+    return {
+      id: this.editingId ?? createId(),
+      title: this.el('title').value.trim(),
+      servings: Number(this.el('servings').value),
+      ingredientsText: this.el('ingredients').value.trim(),
+      instructions: this.el('instructions').value.trim(),
+    };
+  }
+
+  fillForm(recipe) {
+    this.el('title').value = recipe.title;
+    this.el('servings').value = recipe.servings;
+    this.el('ingredients').value = recipe.ingredientsText;
+    this.el('instructions').value = recipe.instructions;
+  }
+
+  parseRaw() {
+    const raw = this.el('raw');
+    if (!raw.value.trim()) {
+      announce('Paste recipe text first.');
+      raw.focus();
+      return;
+    }
+    const parsed = RecipeManager.parseRecipeText(raw.value);
+    this.fillForm(parsed);
+    this.renderAnalysis(this.readForm());
+    const count = parsed.ingredientsText ? parsed.ingredientsText.split('\n').length : 0;
+    announce(`Recipe parsed: “${parsed.title || 'Untitled'}” with ${count} ingredients. Review the details form.`);
+    this.el('title').focus();
+  }
+
+  /** Simulated OCR: deterministic sample text chosen from the file size, revealed in progress steps. */
+  handleImage(file) {
+    const status = this.el('status');
+    const progress = this.el('progress');
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      status.textContent = 'That file is not an image. Choose a JPG, PNG, WebP or HEIC photo.';
+      return;
+    }
+    if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
+    this.previewUrl = URL.createObjectURL(file);
+    const preview = this.el('preview');
+    preview.src = this.previewUrl;
+    preview.alt = `Uploaded recipe photo: ${file.name}`;
+    preview.hidden = false;
+
+    const steps = [[20, 'Detecting text regions…'], [55, 'Recognizing characters…'], [85, 'Structuring recipe sections…'], [100, 'Done']];
+    progress.hidden = false;
+    steps.forEach(([value, label], i) => {
+      window.setTimeout(() => {
+        progress.value = value;
+        status.textContent = `${label} ${value}%`;
+        if (value === 100) {
+          this.el('raw').value = OCR_SAMPLES[file.size % OCR_SAMPLES.length];
+          progress.hidden = true;
+          status.textContent = 'Text extracted (simulated). The details form has been pre-filled for review.';
+          this.parseRaw();
+        }
+      }, (i + 1) * 400);
+    });
+  }
+
+  renderAnalysis(recipe) {
+    const out = this.el('analysis');
+    if (!recipe.ingredientsText) {
+      out.innerHTML = '<p>Add at least one ingredient to analyze.</p>';
+      return;
+    }
+    const temp = { ...recipe, servings: recipe.servings || 1 };
+    const { ingredients: parsed } = RecipeManager.analyze(temp);
+    const { ingredients, perServing, unmatched, isSafe, flagged } = analyzeForUser(temp);
+    const active = SubstitutionEngine.restrictionsFor(state.profile);
+    const checkCell = (ing, i) => {
+      const hits = SubstitutionEngine.detect(parsed[i]).filter((t) => active.includes(t));
+      if (!hits.length) return active.length ? 'Safe' : '—';
+      const flag = flagged.find((f) => f.raw === ing.raw);
+      const badge = SubstitutionEngine.badge(hits, { isAllergy: flag.isAllergy, blocked: ing.blocked });
+      if (ing.blocked) return `${badge} No safe substitute`;
+      const sub = flag.substitute;
+      return sub.name === 'Omit'
+        ? `${badge} Omitted. ${escapeHTML(sub.note)}`
+        : `${badge} Swapped for <strong>${escapeHTML(sub.name)}</strong> (${escapeHTML(sub.ratio)}). ${escapeHTML(sub.note)}`;
+    };
+    const rows = ingredients.map((ing, i) => `
+      <tr>
+        <td>${escapeHTML(ing.raw)}</td>
+        <td>${ing.foodId ? escapeHTML(FOOD_DB[ing.foodId].name) : '<span class="badge badge--warn"><span aria-hidden="true">!</span> Not recognized</span>'}</td>
+        <td>${ing.foodId ? `${fmt(ing.grams)} g` : '—'}</td>
+        <td>${fmt(ing.nutrients.calories)}</td>
+        <td>${checkCell(ing, i)}</td>
+      </tr>`).join('');
+    out.innerHTML = `
+      <p class="analysis__summary">Per serving: <strong>${fmt(perServing.calories)} kcal</strong> ·
+        ${fmt(perServing.protein)} g protein · ${fmt(perServing.carbs)} g carbs · ${fmt(perServing.fat)} g fat ·
+        ${fmt(perServing.fiber)} g fiber · ${fmt(perServing.iron)} mg iron</p>
+      ${!isSafe ? `<p class="analysis__danger">${SubstitutionEngine.badge(blockedHits(flagged), { blocked: true })} This recipe contains an allergen with no safe substitute. It will be left out of your meal plan and grocery list.</p>` : ''}
+      ${isSafe && flagged.length ? `<p class="analysis__warn">Nutrition reflects ${flagged.length} swap${flagged.length === 1 ? '' : 's'} for your allergies and diet.</p>` : ''}
+      ${unmatched ? `<p class="analysis__warn">${unmatched} ingredient${unmatched === 1 ? ' was' : 's were'} not found in the nutrition dictionary and ${unmatched === 1 ? 'is' : 'are'} excluded from totals.</p>` : ''}
+      <div class="table-wrap">
+        <table class="data-table">
+          <caption>Ingredient matches for the whole recipe</caption>
+          <thead><tr><th scope="col">Ingredient</th><th scope="col">Matched food</th><th scope="col">Weight</th><th scope="col">kcal</th><th scope="col">Allergy &amp; diet check</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  validate(recipe) {
+    const checks = [
+      [this.el('title'), recipe.title.length > 0, 'Enter a recipe title.'],
+      [this.el('servings'), recipe.servings >= 1 && recipe.servings <= 50, 'Enter servings between 1 and 50.'],
+      [this.el('ingredients'), recipe.ingredientsText.length > 0, 'Add at least one ingredient.'],
+    ];
+    let first = null;
+    checks.forEach(([input, ok, message]) => {
+      setFieldError(input, ok ? '' : message);
+      if (!ok && !first) first = input;
+    });
+    return first;
+  }
+
+  save() {
+    const recipe = this.readForm();
+    const invalid = this.validate(recipe);
+    if (invalid) {
+      invalid.focus();
+      announce('Please fix the highlighted recipe fields.');
+      return;
+    }
+    const isUpdate = RecipeLibrary.upsert(recipe);
+    this.reset();
+    this.onSaved(recipe, isUpdate);
+  }
+
+  edit(recipe) {
+    this.editingId = recipe.id;
+    this.fillForm(recipe);
+    this.renderAnalysis(recipe);
+    this.el('cancel').hidden = false;
+    this.el('save').textContent = 'Update recipe';
+    this.el('title').focus();
+    announce(`Editing “${recipe.title}”.`);
+  }
+
+  reset() {
+    this.editingId = null;
+    this.el('form').reset();
+    this.el('raw').value = '';
+    this.el('form').querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
+    this.el('form').querySelectorAll('.field-error').forEach((el) => { el.textContent = ''; });
+    this.el('cancel').hidden = true;
+    this.el('save').textContent = 'Save recipe';
+    this.el('analysis').innerHTML = '';
+  }
+}
+
+/* ---------- Onboarding wizard ---------- */
+
+const OnboardingWizard = {
+  STEP_NAMES: ['Goals & activity', 'Diet & allergies', 'Body composition & biometrics', 'First recipe'],
+  LENGTH_LIMITS: { metric: { min: 40, max: 200, label: '(cm)' }, imperial: { min: 16, max: 80, label: '(in)' } },
+  MASS_LIMITS: { metric: { min: 20, max: 200, label: '(kg)' }, imperial: { min: 44, max: 440, label: '(lb)' } },
+  mode: 'onboarding',
+  step: 1,
+  importer: null,
+
+  init() {
+    $('#goal-timeline').innerHTML = NutritionEngine.TIMELINES
+      .map((w) => `<option value="${w}">${w} weeks (${NutritionEngine.pace(w).label.toLowerCase()} pace)</option>`).join('');
+    $('#diet-options').innerHTML = Object.entries(DIETS).map(([id, diet]) => `
+      <div class="choice">
+        <input type="radio" id="diet-${id}" name="diet" value="${id}">
+        <label for="diet-${id}"><span class="choice__title">${diet.label}</span> <span class="choice__desc">${diet.description}</span></label>
+      </div>`).join('');
+    $('#allergy-options').innerHTML = ALLERGY_IDS.map((id) => `
+      <div class="check">
+        <input type="checkbox" id="allergy-${id}" name="allergy" value="${id}">
+        <label for="allergy-${id}">${RESTRICTIONS[id].option}</label>
+      </div>`).join('');
+
+    this.importer = new RecipeImporter($('#onboarding-importer'), {
+      prefix: 'ob',
+      onSaved: (recipe) => {
+        this.renderAdded();
+        announce(`Added “${recipe.title}” to your library.`);
+      },
+    });
+
+    document.querySelectorAll('input[name="units"]').forEach((radio) => {
+      radio.addEventListener('change', () => this.switchUnits(radio.value));
+    });
+    $('#wizard-back').addEventListener('click', () => this.showStep(this.step - 1));
+    $('#wizard-next').addEventListener('click', () => this.next());
+    $('#wizard-save').addEventListener('click', () => this.finish());
+    $('#wizard-signout').addEventListener('click', () => App.signOut());
+    $('#wizard-cancel').addEventListener('click', () => {
+      App.showApp();
+      announce('Edits discarded.');
+    });
+  },
+
+  /** @param {'onboarding'|'edit'} mode */
+  start(mode) {
+    this.mode = mode;
+    const editing = mode === 'edit';
+    this.fill(state.profile);
+    this.importer.reset();
+    this.renderAdded();
+    $('#wizard-title').innerHTML = editing ? 'Edit your <em>preferences</em>' : 'Let’s set <em>your table</em>';
+    $('#wizard-intro').textContent = editing
+      ? 'Update any step, then save. Targets, swaps and your grocery list refresh instantly.'
+      : `Welcome, ${firstName()}. Four short steps and your personal targets, plan and grocery list are ready.`;
+    $('#wizard-cancel').hidden = !editing;
+    $('#wizard-signout').hidden = editing;
+    $('#wizard-save').hidden = !editing;
+    App.showView('onboarding', { focus: false });
+    this.showStep(editing ? 1 : state.profile.onboardingStep);
+  },
+
+  showStep(n) {
+    this.step = Math.min(4, Math.max(1, n));
+    document.querySelectorAll('.wizard-step').forEach((section) => {
+      section.hidden = Number(section.dataset.step) !== this.step;
+    });
+    const label = `Step ${this.step} of 4: ${this.STEP_NAMES[this.step - 1]}`;
+    $('#wizard-progress-label').textContent = label;
+    const bar = $('#wizard-progressbar');
+    bar.setAttribute('aria-valuenow', String(this.step));
+    bar.setAttribute('aria-valuetext', label);
+    $('#wizard-progress-fill').style.width = `${(this.step / 4) * 100}%`;
+    [...$('#wizard-steps').children].forEach((li, i) => {
+      li.classList.toggle('is-done', i + 1 < this.step);
+      if (i + 1 === this.step) li.setAttribute('aria-current', 'step');
+      else li.removeAttribute('aria-current');
+    });
+    $('#wizard-back').disabled = this.step === 1;
+    $('#wizard-next').textContent = this.step < 4 ? 'Continue' : (this.mode === 'edit' ? 'Save changes' : 'Finish setup');
+    $(`#step-${this.step}-title`).focus();
+  },
+
+  next() {
+    if (this.step === 4) {
+      this.finish();
+      return;
+    }
+    if (this.step === 3) {
+      const invalid = this.validateBiometrics();
+      if (invalid) {
+        invalid.focus();
+        announce('Please fix the highlighted fields.');
+        return;
+      }
+    }
+    if (this.mode === 'onboarding') {
+      // Persist each completed step so a reload resumes where the user left off.
+      state.profile = { ...state.profile, ...this.readStep(this.step), onboardingStep: this.step + 1 };
+      Storage.save(Storage.KEYS.profile, state.profile);
+    }
+    this.showStep(this.step + 1);
+  },
+
+  finish() {
+    const invalid = this.validateBiometrics();
+    if (invalid) {
+      this.showStep(3);
+      invalid.focus();
+      announce('Please complete your biometrics before saving.');
+      return;
+    }
+    const wasOnboarding = this.mode === 'onboarding';
+    state.profile = {
+      ...state.profile,
+      ...this.readStep(1),
+      ...this.readStep(2),
+      ...this.readStep(3),
+      onboarded: true,
+      onboardingStep: 4,
+      updatedAt: new Date().toISOString(),
+    };
+    Storage.save(Storage.KEYS.profile, state.profile);
+    App.showApp();
+    const kcal = fmt(currentTargets().targets.calories);
+    announce(wasOnboarding
+      ? `Setup complete. Welcome to your dashboard, ${firstName()}: your target is ${kcal} calories a day.`
+      : `Preferences saved. Your target is now ${kcal} calories a day; recipes and grocery list updated.`);
+  },
+
+  readStep(n) {
+    if (n === 1) {
+      return {
+        goal: $('input[name="goal"]:checked').value,
+        timelineWeeks: Number($('#goal-timeline').value),
+        activity: $('#activity').value,
+      };
+    }
+    if (n === 2) {
+      return {
+        diet: $('input[name="diet"]:checked').value,
+        allergies: [...document.querySelectorAll('input[name="allergy"]:checked')].map((b) => b.value),
+      };
+    }
+    if (n === 3) {
+      const units = $('input[name="units"]:checked').value;
+      const metric = units === 'metric';
+      const optional = (sel, factor = 1) => ($(sel).value === '' ? null : round1(Number($(sel).value) * factor));
+      return {
+        units,
+        age: Number($('#age').value),
+        sex: $('#sex').value,
+        heightCm: metric ? Number($('#height-cm').value) : (Number($('#height-ft').value) * 12 + Number($('#height-in').value)) * 2.54,
+        weightKg: metric ? Number($('#weight-kg').value) : Number($('#weight-lb').value) * KG_PER_LB,
+        bodyFatPct: optional('#body-fat'),
+        waistCm: optional('#waist', metric ? 1 : 2.54),
+        hipCm: optional('#hip', metric ? 1 : 2.54),
+        leanMassKg: optional('#lean-mass', metric ? 1 : KG_PER_LB),
+      };
+    }
+    return {};
+  },
+
+  fill(profile) {
+    const metric = profile.units === 'metric';
+    const value = (n) => (n === null || n === undefined ? '' : n);
+    $(`#goal-${profile.goal}`).checked = true;
+    $('#goal-timeline').value = String(profile.timelineWeeks);
+    $('#activity').value = profile.activity;
+    $(`#diet-${profile.diet}`).checked = true;
+    document.querySelectorAll('input[name="allergy"]').forEach((box) => { box.checked = profile.allergies.includes(box.value); });
+    $(`#units-${profile.units}`).checked = true;
+    $('#age').value = value(profile.age);
+    $('#sex').value = profile.sex;
+    if (profile.heightCm) {
+      const inches = profile.heightCm / 2.54;
+      $('#height-cm').value = round1(profile.heightCm);
+      $('#height-ft').value = Math.floor(inches / 12);
+      $('#height-in').value = round1(inches % 12);
+    } else {
+      ['#height-cm', '#height-ft', '#height-in'].forEach((sel) => { $(sel).value = ''; });
+    }
+    $('#weight-kg').value = profile.weightKg ? round1(profile.weightKg) : '';
+    $('#weight-lb').value = profile.weightKg ? round1(profile.weightKg / KG_PER_LB) : '';
+    $('#body-fat').value = value(profile.bodyFatPct);
+    $('#waist').value = profile.waistCm ? round1(metric ? profile.waistCm : profile.waistCm / 2.54) : '';
+    $('#hip').value = profile.hipCm ? round1(metric ? profile.hipCm : profile.hipCm / 2.54) : '';
+    $('#lean-mass').value = profile.leanMassKg ? round1(metric ? profile.leanMassKg : profile.leanMassKg / KG_PER_LB) : '';
+    document.querySelectorAll('.wizard-step [aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
+    document.querySelectorAll('.wizard-step .field-error').forEach((el) => { el.textContent = ''; });
+    this.applyUnitLimits(profile.units);
+  },
+
+  applyUnitLimits(units) {
+    document.querySelectorAll('[data-units]').forEach((group) => { group.hidden = group.dataset.units !== units; });
+    const length = this.LENGTH_LIMITS[units];
+    const mass = this.MASS_LIMITS[units];
+    document.querySelectorAll('[data-length]').forEach((input) => Object.assign(input, { min: length.min, max: length.max, step: 0.1 }));
+    document.querySelectorAll('[data-mass]').forEach((input) => Object.assign(input, { min: mass.min, max: mass.max, step: 0.1 }));
+    document.querySelectorAll('[data-length-unit]').forEach((el) => { el.textContent = length.label; });
+    document.querySelectorAll('[data-mass-unit]').forEach((el) => { el.textContent = mass.label; });
+  },
+
+  /** Converts visible values when the unit system changes so no data is lost. */
+  switchUnits(units) {
+    const convert = (sel, factor) => {
+      if (Number($(sel).value) > 0) $(sel).value = round1(Number($(sel).value) * factor);
+    };
+    if (units === 'metric') {
+      const inches = Number($('#height-ft').value) * 12 + Number($('#height-in').value);
+      if (inches > 0) $('#height-cm').value = round1(inches * 2.54);
+      if (Number($('#weight-lb').value) > 0) $('#weight-kg').value = round1(Number($('#weight-lb').value) * KG_PER_LB);
+      convert('#waist', 2.54);
+      convert('#hip', 2.54);
+      convert('#lean-mass', KG_PER_LB);
+    } else {
+      const cm = Number($('#height-cm').value);
+      if (cm > 0) {
+        $('#height-ft').value = Math.floor(cm / 2.54 / 12);
+        $('#height-in').value = round1((cm / 2.54) % 12);
+      }
+      if (Number($('#weight-kg').value) > 0) $('#weight-lb').value = round1(Number($('#weight-kg').value) / KG_PER_LB);
+      convert('#waist', 1 / 2.54);
+      convert('#hip', 1 / 2.54);
+      convert('#lean-mass', 1 / KG_PER_LB);
+    }
+    this.applyUnitLimits(units);
+  },
+
+  /** Validates visible step-3 numbers; optional fields may be blank. Returns first invalid input. */
+  validateBiometrics() {
+    const inputs = [...document.querySelectorAll('[data-step="3"] input[type="number"]')].filter((i) => !i.closest('[hidden]'));
+    let first = null;
+    inputs.forEach((input) => {
+      const value = Number(input.value);
+      const blankOptional = input.value === '' && !input.required;
+      let message = '';
+      if (!blankOptional && (input.value === '' || value < Number(input.min) || value > Number(input.max))) {
+        message = `Enter a number between ${input.min} and ${input.max}${input.required ? '' : ', or leave it blank'}.`;
+      }
+      setFieldError(input, message);
+      if (message && !first) first = input;
+    });
+    const lean = $('#lean-mass');
+    const weight = $('#units-metric').checked ? $('#weight-kg') : $('#weight-lb');
+    if (!first && lean.value !== '' && Number(lean.value) >= Number(weight.value)) {
+      setFieldError(lean, 'Lean body mass must be less than your total weight.');
+      first = lean;
+    }
+    return first;
+  },
+
+  renderAdded() {
+    const custom = state.recipes.filter((r) => !r.id.startsWith('seed-'));
+    $('#onboarding-added').innerHTML = custom.length
+      ? `<h3>In your library</h3><ul class="added-list">${custom.map((r) => `<li>${escapeHTML(r.title)}</li>`).join('')}</ul>`
+      : '';
+  },
+};
+
+/* ---------- Recipe library ---------- */
+
+const RecipeLibrary = {
+  init() {
+    $('#recipe-library').addEventListener('click', (e) => {
+      const button = e.target.closest('button[data-action]');
+      if (!button) return;
+      const recipe = state.recipes.find((r) => r.id === button.dataset.id);
+      if (button.dataset.action === 'edit') App.importer.edit(recipe);
+      if (button.dataset.action === 'delete') this.remove(recipe);
+    });
+  },
+
+  /** Inserts or replaces a recipe; returns true when it was an update. */
+  upsert(recipe) {
+    const index = state.recipes.findIndex((r) => r.id === recipe.id);
+    if (index >= 0) state.recipes.splice(index, 1, recipe);
+    else state.recipes.push(recipe);
+    Storage.save(Storage.KEYS.recipes, state.recipes);
+    return index >= 0;
+  },
+
+  remove(recipe) {
+    if (!window.confirm(`Delete “${recipe.title}”? It will also be removed from your meal plan.`)) return;
+    state.recipes = state.recipes.filter((r) => r.id !== recipe.id);
+    DAYS.forEach((day) => MEAL_SLOTS.forEach((slot) => {
+      if (state.plan[day][slot.id] === recipe.id) state.plan[day][slot.id] = '';
+    }));
+    Storage.save(Storage.KEYS.recipes, state.recipes);
+    Storage.save(Storage.KEYS.plan, state.plan);
+    if (App.importer.editingId === recipe.id) App.importer.reset();
+    App.renderAll();
+    $('#library-heading').focus();
+    announce(`Deleted “${recipe.title}”.`);
+  },
+
+  render() {
+    $('#recipe-count').textContent = String(state.recipes.length);
+    const list = $('#recipe-library');
+    if (!state.recipes.length) {
+      list.innerHTML = '<li class="empty">No recipes yet. Import one above to get started.</li>';
+      return;
+    }
+    list.innerHTML = state.recipes.map((recipe) => {
+      const { perServing: p, flagged, isSafe } = analyzeForUser(recipe);
+      const title = escapeHTML(recipe.title);
+      const checks = flagged.map((f) => {
+        const badge = SubstitutionEngine.badge(f.hits, { isAllergy: f.isAllergy, blocked: !f.substitute });
+        if (!f.substitute) return `<li>${badge} ${escapeHTML(f.original)}: no safe substitute; recipe unavailable</li>`;
+        return `<li>${badge} ${escapeHTML(f.original)} → <strong>${escapeHTML(f.substitute.name === 'Omit' ? 'omitted' : f.substitute.name)}</strong></li>`;
+      }).join('');
+      return `
+        <li>
+          <article class="card recipe-card">
+            <h3>${title}</h3>
+            <p class="meta">${recipe.servings} serving${recipe.servings === 1 ? '' : 's'} · per serving${isSafe && flagged.length ? ', with your swaps' : ''}</p>
+            <dl class="macro-chips">
+              <div><dt>kcal</dt><dd>${fmt(p.calories)}</dd></div>
+              <div><dt>Protein</dt><dd>${fmt(p.protein)} g</dd></div>
+              <div><dt>Carbs</dt><dd>${fmt(p.carbs)} g</dd></div>
+              <div><dt>Fat</dt><dd>${fmt(p.fat)} g</dd></div>
+            </dl>
+            ${checks ? `<ul class="allergy-list" aria-label="Allergy and diet check for ${title}">${checks}</ul>` : ''}
+            <div class="button-row">
+              <button type="button" class="btn btn--ghost" data-action="edit" data-id="${recipe.id}" aria-label="Edit ${title}">Edit</button>
+              <button type="button" class="btn btn--ghost btn--danger" data-action="delete" data-id="${recipe.id}" aria-label="Delete ${title}">Delete</button>
+            </div>
+          </article>
+        </li>`;
+    }).join('');
+  },
+};
+
+/* ---------- Dashboard & targets ---------- */
 
 const DashboardUI = {
   init() {
-    const select = $('#view-day');
-    select.innerHTML = DAYS.map((d) => `<option value="${d}">${DAY_LABELS[d]}${d === todayKey() ? ' (today)' : ''}</option>`).join('');
-    select.value = state.viewDay;
-    select.addEventListener('change', () => {
-      state.viewDay = select.value;
-      App.renderNutrition();
+    document.querySelectorAll('[data-day-select]').forEach((select) => {
+      select.innerHTML = DAYS.map((d) => `<option value="${d}">${DAY_LABELS[d]}${d === todayKey() ? ' (today)' : ''}</option>`).join('');
+      select.addEventListener('change', () => App.setViewDay(select.value));
     });
   },
 
@@ -1428,355 +2159,99 @@ const DashboardUI = {
     $('#macro-list').innerHTML = NUTRIENTS.filter((m) => m.group === 'macro').map((m) => this.row(m, intake[m.key], targets[m.key])).join('');
     $('#micro-list').innerHTML = NUTRIENTS.filter((m) => m.group === 'micro').map((m) => this.row(m, intake[m.key], targets[m.key])).join('');
     document.querySelectorAll('[data-day-label]').forEach((el) => { el.textContent = DAY_LABELS[state.viewDay]; });
-
     return { intake, targets, plannedCount: planned.length, meals };
   },
 };
 
-/* ---------- Recommendations ---------- */
+const TargetsUI = {
+  render() {
+    const { bmr, tdee, pace, projectedKg, targets } = currentTargets();
+    const { profile } = state;
+    const metric = profile.units === 'metric';
+    const mass = (kg) => (metric ? `${fmt(Math.abs(kg))} kg` : `${fmt(Math.abs(kg) / KG_PER_LB)} lb`);
+    const goal = NutritionEngine.GOALS[profile.goal].label;
+    const projection = profile.goal === 'maintain'
+      ? 'Maintenance: calories match your daily energy expenditure.'
+      : `${goal} over ${profile.timelineWeeks} weeks (${pace.toLowerCase()} pace): about ${mass(projectedKg)} ${projectedKg < 0 ? 'lost' : 'gained'} if followed consistently.`;
+    const ketoNote = profile.diet === 'keto' ? '<p class="field__hint">Keto: carbohydrates capped at 30 g, with fat filling the remaining energy.</p>' : '';
+    const rows = NUTRIENTS.map((meta) => `
+      <tr><th scope="row">${meta.label}${meta.isLimit ? ' (max)' : ''}</th><td>${fmt(targets[meta.key])} ${meta.unit}</td></tr>`).join('');
+
+    $('#targets-output').innerHTML = `
+      <article class="card stack" aria-labelledby="energy-title">
+        <h3 id="energy-title">Energy &amp; body composition</h3>
+        <div class="stat-row">
+          <p class="stat"><span class="stat__value">${fmt(targets.calories)}</span><span class="stat__label">Daily calories</span></p>
+          <p class="stat"><span class="stat__value">${fmt(bmr)}</span><span class="stat__label">BMR (kcal)</span></p>
+          <p class="stat"><span class="stat__value">${fmt(tdee)}</span><span class="stat__label">TDEE (kcal)</span></p>
+        </div>
+        <p>${projection}</p>
+        ${ketoNote}
+        ${this.bodyTable()}
+      </article>
+      <article class="card" aria-labelledby="targets-table-title">
+        <h3 id="targets-table-title">Daily targets</h3>
+        <div class="table-wrap">
+          <table class="data-table">
+            <caption class="sr-only">Daily nutrition targets</caption>
+            <thead><tr><th scope="col">Nutrient</th><th scope="col">Daily target</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </article>`;
+  },
+
+  /** BMI, waist ratios and lean mass rows shared by the dashboard and the profile drawer. */
+  bodyRows() {
+    const c = NutritionEngine.bodyComposition(state.profile);
+    const metric = state.profile.units === 'metric';
+    const rows = [['BMI', fmt(c.bmi), c.bmiCategory]];
+    rows.push(c.waistToHip
+      ? ['Waist-to-hip ratio', c.waistToHip.toFixed(2), `${c.waistToHipRisk} (WHO cut-off ${c.waistToHipLimit})`]
+      : ['Waist-to-hip ratio', '—', 'Add waist and hip measurements']);
+    if (c.waistToHeight) rows.push(['Waist-to-height ratio', c.waistToHeight.toFixed(2), `${c.waistToHeightRisk} (cut-off 0.5)`]);
+    if (c.leanMassKg) {
+      rows.push(['Lean body mass', metric ? `${fmt(c.leanMassKg)} kg` : `${fmt(c.leanMassKg / KG_PER_LB)} lb`, c.leanSource]);
+      rows.push(['BMR (Katch-McArdle)', `${fmt(c.katchBmr)} kcal`, 'Lean-mass estimate, for comparison']);
+    }
+    return rows;
+  },
+
+  bodyTable() {
+    return `
+      <div class="table-wrap">
+        <table class="data-table">
+          <caption>Body composition</caption>
+          <thead><tr><th scope="col">Measure</th><th scope="col">Value</th><th scope="col">Interpretation</th></tr></thead>
+          <tbody>${this.bodyRows().map(([label, value, note]) => `<tr><th scope="row">${label}</th><td>${value}</td><td>${note}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+  },
+};
 
 const RecommendationsUI = {
   render({ intake, targets, plannedCount }) {
-    const recs = RecommendationEngine.recommend(intake, targets, plannedCount, state.profile.allergies);
+    const recs = RecommendationEngine.recommend(intake, targets, plannedCount, SubstitutionEngine.restrictionsFor(state.profile));
     const label = { high: 'High priority', medium: 'Suggested', info: 'Note' };
+    const level = { high: 'danger', medium: 'warn', info: 'ok' };
     $('#recommendation-list').innerHTML = recs.map((rec) => `
       <li>
         <article class="card rec rec--${rec.priority}">
-          <p class="rec__priority"><span class="badge badge--${rec.priority === 'high' ? 'danger' : rec.priority === 'medium' ? 'warn' : 'ok'}">${label[rec.priority]}</span></p>
+          <p><span class="badge badge--${level[rec.priority]}">${label[rec.priority]}</span></p>
           <h3 class="rec__food">${escapeHTML(rec.food)}</h3>
-          <p class="rec__trigger"><strong>Why now:</strong> ${escapeHTML(rec.trigger)}</p>
+          <p class="meta"><strong>Why now:</strong> ${escapeHTML(rec.trigger)}</p>
           <p>${escapeHTML(rec.reason)}</p>
-          ${rec.allergyNote ? `<p class="rec__allergy">${escapeHTML(rec.allergyNote)}</p>` : ''}
+          ${rec.restrictionNote ? `<p class="meta">${escapeHTML(rec.restrictionNote)}</p>` : ''}
         </article>
       </li>`).join('');
   },
 };
 
-/* ---------- Schedule & supplements ---------- */
-
-const ScheduleUI = {
-  init() {
-    this.syncForm();
-    $('#supplement-form').addEventListener('change', () => {
-      state.supplements = {
-        selected: [...document.querySelectorAll('input[name="supplements"]:checked')].map((i) => i.value),
-        coffeeAtBreakfast: $('#coffee-breakfast').checked,
-      };
-      Storage.save(Storage.KEYS.supplements, state.supplements);
-      this.render(mealsForDay(state.viewDay));
-      GroceryUI.render();
-    });
-  },
-
-  /** Reflects the active user's supplement choices in the form. */
-  syncForm() {
-    $('#supplement-options').innerHTML = SUPPLEMENTS.map((s) => `
-      <div class="check">
-        <input type="checkbox" id="supp-${s.id}" name="supplements" value="${s.id}" ${state.supplements.selected.includes(s.id) ? 'checked' : ''}>
-        <label for="supp-${s.id}">${s.label}</label>
-      </div>`).join('');
-    $('#coffee-breakfast').checked = state.supplements.coffeeAtBreakfast;
-  },
-
-  render(meals) {
-    const { selected, coffeeAtBreakfast } = state.supplements;
-    const schedule = ScheduleOptimizer.build(meals, selected, coffeeAtBreakfast);
-    $('#timeline').innerHTML = MEAL_SLOTS.map((slot) => {
-      const meal = meals[slot.id];
-      const tips = ScheduleOptimizer.mealTips(slot.id, meal, coffeeAtBreakfast);
-      let mealText = '<p class="timeline__meal timeline__meal--empty">No meal planned</p>';
-      if (meal?.blocked) {
-        const allergens = [...new Set(meal.flagged.filter((f) => !f.substitute).flatMap((f) => f.allergens))];
-        mealText = `<p class="timeline__meal">${escapeHTML(meal.recipe.title)}</p>
-           <p class="allergy-note">${AllergenGuard.badge(allergens, 'danger')} No safe substitute, so this meal is excluded. Choose another recipe.</p>`;
-      } else if (meal) {
-        const swaps = meal.flagged.map((f) => `${f.substitute.name} for ${f.original.toLowerCase()}`);
-        mealText = `<p class="timeline__meal">${escapeHTML(meal.recipe.title)}</p>
-           <p class="timeline__meta">${fmt(meal.nutrients.calories)} kcal · ${fmt(meal.nutrients.protein)} g protein · ${fmt(meal.nutrients.fat)} g fat · ${fmt(meal.nutrients.vitaminC)} mg vitamin C</p>
-           ${swaps.length ? `<p class="allergy-note">Allergy-safe swaps: ${escapeHTML(swaps.join('; '))}.</p>` : ''}`;
-      }
-      const supps = schedule[slot.id].length
-        ? `<ul class="supp-list">${schedule[slot.id].map((s) => `
-            <li><strong>${SUPPLEMENT_BY_ID[s.id].label}</strong>: ${escapeHTML(s.reason)}</li>`).join('')}</ul>`
-        : '';
-      const tipList = tips.length ? `<ul class="tip-list">${tips.map((t) => `<li>${t}</li>`).join('')}</ul>` : '';
-      return `
-        <li class="timeline__item">
-          <article class="card timeline__card">
-            <h3><time datetime="${slot.time}">${slot.display}</time> <span class="timeline__slot">${slot.label}</span></h3>
-            ${mealText}${supps}${tipList}
-          </article>
-        </li>`;
-    }).join('');
-  },
-};
-
-/* ---------- Recipe importer ---------- */
-
-const RecipeUI = {
-  form: null,
-  previewUrl: null,
-
-  init() {
-    this.form = $('#recipe-form');
-
-    $('#parse-raw').addEventListener('click', () => this.parseRaw());
-    $('#analyze-recipe').addEventListener('click', () => this.renderAnalysis(this.readForm()));
-    $('#cancel-edit').addEventListener('click', () => this.resetForm());
-    this.form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.save();
-    });
-
-    // Custom drop zone: role="button" + Enter/Space keyboard support.
-    const zone = $('#ocr-dropzone');
-    const fileInput = $('#ocr-file');
-    zone.addEventListener('click', () => fileInput.click());
-    zone.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        fileInput.click();
-      }
-    });
-    zone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      zone.classList.add('is-dragging');
-    });
-    zone.addEventListener('dragleave', () => zone.classList.remove('is-dragging'));
-    zone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      zone.classList.remove('is-dragging');
-      this.handleImage(e.dataTransfer.files[0]);
-    });
-    fileInput.addEventListener('change', () => this.handleImage(fileInput.files[0]));
-
-    $('#recipe-library').addEventListener('click', (e) => {
-      const button = e.target.closest('button[data-action]');
-      if (!button) return;
-      if (button.dataset.action === 'edit') this.edit(button.dataset.id);
-      if (button.dataset.action === 'delete') this.remove(button.dataset.id);
-    });
-  },
-
-  readForm() {
-    const f = this.form.elements;
-    return {
-      id: state.editingId ?? createId(),
-      title: f['recipe-title'].value.trim(),
-      servings: Number(f['recipe-servings'].value),
-      ingredientsText: f['recipe-ingredients'].value.trim(),
-      instructions: f['recipe-instructions'].value.trim(),
-    };
-  },
-
-  fillForm(recipe) {
-    const f = this.form.elements;
-    f['recipe-title'].value = recipe.title;
-    f['recipe-servings'].value = recipe.servings;
-    f['recipe-ingredients'].value = recipe.ingredientsText;
-    f['recipe-instructions'].value = recipe.instructions;
-  },
-
-  parseRaw() {
-    const raw = $('#raw-recipe').value;
-    if (!raw.trim()) {
-      announce('Paste recipe text first.');
-      $('#raw-recipe').focus();
-      return;
-    }
-    const parsed = RecipeParser.parseRecipeText(raw);
-    this.fillForm(parsed);
-    this.renderAnalysis(this.readForm());
-    const count = parsed.ingredientsText ? parsed.ingredientsText.split('\n').length : 0;
-    announce(`Recipe parsed: “${parsed.title || 'Untitled'}” with ${count} ingredients. Review the form below.`);
-    $('#recipe-title').focus();
-  },
-
-  /** Simulated OCR: deterministic sample text chosen from the file size, revealed in progress steps. */
-  handleImage(file) {
-    const status = $('#ocr-status');
-    const progress = $('#ocr-progress');
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      status.textContent = 'That file is not an image. Choose a JPG, PNG, WebP or HEIC photo.';
-      return;
-    }
-    if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
-    this.previewUrl = URL.createObjectURL(file);
-    const preview = $('#ocr-preview');
-    preview.src = this.previewUrl;
-    preview.alt = `Uploaded recipe photo: ${file.name}`;
-    preview.hidden = false;
-
-    const steps = [[20, 'Detecting text regions…'], [55, 'Recognizing characters…'], [85, 'Structuring recipe sections…'], [100, 'Done']];
-    progress.hidden = false;
-    steps.forEach(([value, label], i) => {
-      window.setTimeout(() => {
-        progress.value = value;
-        status.textContent = `${label} ${value}%`;
-        if (value === 100) {
-          $('#raw-recipe').value = OCR_SAMPLES[file.size % OCR_SAMPLES.length];
-          progress.hidden = true;
-          status.textContent = 'Text extracted (simulated). Fields have been pre-filled below for review.';
-          this.parseRaw();
-        }
-      }, (i + 1) * 400);
-    });
-  },
-
-  renderAnalysis(recipe) {
-    const out = $('#analysis-output');
-    if (!recipe.ingredientsText) {
-      out.innerHTML = '<p>Add at least one ingredient to analyze.</p>';
-      return;
-    }
-    const temp = { ...recipe, servings: recipe.servings || 1 };
-    const { ingredients: parsed } = RecipeParser.analyze(temp);
-    const { ingredients, perServing, unmatched, isSafe, flagged } = analyzeForUser(temp);
-    const active = state.profile.allergies;
-    const allergyCell = (ing, i) => {
-      const hits = AllergenGuard.detect(parsed[i]).filter((a) => active.includes(a));
-      if (!hits.length) return active.length ? 'Safe' : '—';
-      if (ing.blocked) return `${AllergenGuard.badge(hits, 'danger')} No safe substitute`;
-      const sub = flagged.find((f) => f.raw === ing.raw).substitute;
-      return `${AllergenGuard.badge(hits)} Swapped for <strong>${escapeHTML(sub.name)}</strong> (${escapeHTML(sub.ratio)}). ${escapeHTML(sub.note)}`;
-    };
-    const rows = ingredients.map((ing, i) => `
-      <tr>
-        <td>${escapeHTML(ing.raw)}</td>
-        <td>${ing.foodId ? escapeHTML(FOOD_DB[ing.foodId].name) : '<span class="badge badge--warn"><span aria-hidden="true">!</span> Not recognized</span>'}</td>
-        <td>${ing.foodId ? `${fmt(ing.grams)} g` : '—'}</td>
-        <td>${fmt(ing.nutrients.calories)}</td>
-        <td>${allergyCell(ing, i)}</td>
-      </tr>`).join('');
-    const blockedAllergens = [...new Set(flagged.filter((f) => !f.substitute).flatMap((f) => f.allergens))];
-    out.innerHTML = `
-      <p class="analysis__summary">Per serving: <strong>${fmt(perServing.calories)} kcal</strong> ·
-        ${fmt(perServing.protein)} g protein · ${fmt(perServing.carbs)} g carbs · ${fmt(perServing.fat)} g fat ·
-        ${fmt(perServing.fiber)} g fiber · ${fmt(perServing.iron)} mg iron</p>
-      ${!isSafe ? `<p class="analysis__danger">${AllergenGuard.badge(blockedAllergens, 'danger')} This recipe contains an allergen with no safe substitute. It will be excluded from your meal plan and grocery list.</p>` : ''}
-      ${isSafe && flagged.length ? `<p class="analysis__warn">Nutrition reflects ${flagged.length} allergy-safe swap${flagged.length === 1 ? '' : 's'} for your profile.</p>` : ''}
-      ${unmatched ? `<p class="analysis__warn">${unmatched} ingredient${unmatched === 1 ? ' was' : 's were'} not found in the nutrition dictionary and ${unmatched === 1 ? 'is' : 'are'} excluded from totals.</p>` : ''}
-      <div class="table-wrap">
-        <table class="data-table">
-          <caption>Ingredient matches for the whole recipe</caption>
-          <thead><tr><th scope="col">Ingredient</th><th scope="col">Matched food</th><th scope="col">Weight</th><th scope="col">kcal</th><th scope="col">Allergy check</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
-  },
-
-  validate(recipe) {
-    const checks = [
-      ['recipe-title', recipe.title.length > 0, 'Enter a recipe title.'],
-      ['recipe-servings', recipe.servings >= 1 && recipe.servings <= 50, 'Enter servings between 1 and 50.'],
-      ['recipe-ingredients', recipe.ingredientsText.length > 0, 'Add at least one ingredient.'],
-    ];
-    let firstInvalid = null;
-    checks.forEach(([id, ok, message]) => {
-      $(`#${id}`).setAttribute('aria-invalid', String(!ok));
-      $(`#${id}-error`).textContent = ok ? '' : message;
-      if (!ok && !firstInvalid) firstInvalid = $(`#${id}`);
-    });
-    return firstInvalid;
-  },
-
-  save() {
-    const recipe = this.readForm();
-    const invalid = this.validate(recipe);
-    if (invalid) {
-      invalid.focus();
-      announce('Please fix the highlighted recipe fields.');
-      return;
-    }
-    const existing = state.recipes.findIndex((r) => r.id === recipe.id);
-    if (existing >= 0) state.recipes.splice(existing, 1, recipe);
-    else state.recipes.push(recipe);
-    Storage.save(Storage.KEYS.recipes, state.recipes);
-    this.resetForm();
-    App.renderRecipesChanged();
-    announce(`${existing >= 0 ? 'Updated' : 'Saved'} “${recipe.title}”. It is now available in the weekly meal plan.`);
-  },
-
-  edit(id) {
-    const recipe = state.recipes.find((r) => r.id === id);
-    state.editingId = id;
-    this.fillForm(recipe);
-    this.renderAnalysis(recipe);
-    $('#cancel-edit').hidden = false;
-    $('#save-recipe').textContent = 'Update recipe';
-    $('#recipe-title').focus();
-    announce(`Editing “${recipe.title}”.`);
-  },
-
-  remove(id) {
-    const recipe = state.recipes.find((r) => r.id === id);
-    if (!window.confirm(`Delete “${recipe.title}”? It will also be removed from your meal plan.`)) return;
-    state.recipes = state.recipes.filter((r) => r.id !== id);
-    DAYS.forEach((day) => MEAL_SLOTS.forEach((slot) => {
-      if (state.plan[day][slot.id] === id) state.plan[day][slot.id] = '';
-    }));
-    Storage.save(Storage.KEYS.recipes, state.recipes);
-    Storage.save(Storage.KEYS.plan, state.plan);
-    if (state.editingId === id) this.resetForm();
-    App.renderRecipesChanged();
-    $('#library-heading').focus();
-    announce(`Deleted “${recipe.title}”.`);
-  },
-
-  resetForm() {
-    state.editingId = null;
-    this.form.reset();
-    this.form.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
-    this.form.querySelectorAll('.field-error').forEach((el) => { el.textContent = ''; });
-    $('#cancel-edit').hidden = true;
-    $('#save-recipe').textContent = 'Save recipe';
-    $('#analysis-output').innerHTML = '';
-  },
-
-  renderLibrary() {
-    $('#recipe-count').textContent = String(state.recipes.length);
-    const list = $('#recipe-library');
-    if (!state.recipes.length) {
-      list.innerHTML = '<li class="empty">No recipes yet. Import one above to get started.</li>';
-      return;
-    }
-    list.innerHTML = state.recipes.map((recipe) => {
-      const { perServing: p, flagged, isSafe } = analyzeForUser(recipe);
-      const title = escapeHTML(recipe.title);
-      const allergyList = flagged.length ? `
-            <ul class="allergy-list" aria-label="Allergy check for ${title}">
-              ${flagged.map((f) => (f.substitute
-                ? `<li>${AllergenGuard.badge(f.allergens)} ${escapeHTML(f.original)} → <strong>${escapeHTML(f.substitute.name)}</strong></li>`
-                : `<li>${AllergenGuard.badge(f.allergens, 'danger')} ${escapeHTML(f.original)}: no safe substitute; excluded from your plan</li>`)).join('')}
-            </ul>` : '';
-      return `
-        <li>
-          <article class="card recipe-card">
-            <h3>${title}</h3>
-            <p class="recipe-card__meta">${recipe.servings} serving${recipe.servings === 1 ? '' : 's'} · per serving</p>
-            <dl class="macro-chips">
-              <div><dt>kcal</dt><dd>${fmt(p.calories)}</dd></div>
-              <div><dt>Protein</dt><dd>${fmt(p.protein)} g</dd></div>
-              <div><dt>Carbs</dt><dd>${fmt(p.carbs)} g</dd></div>
-              <div><dt>Fat</dt><dd>${fmt(p.fat)} g</dd></div>
-            </dl>${isSafe && flagged.length ? '\n            <p class="recipe-card__meta">Nutrition shown with allergy-safe swaps.</p>' : ''}${allergyList}
-            <div class="button-row">
-              <button type="button" class="btn btn--ghost" data-action="edit" data-id="${recipe.id}" aria-label="Edit ${title}">Edit</button>
-              <button type="button" class="btn btn--ghost btn--danger" data-action="delete" data-id="${recipe.id}" aria-label="Delete ${title}">Delete</button>
-            </div>
-          </article>
-        </li>`;
-    }).join('');
-  },
-};
-
-/* ---------- Weekly planner ---------- */
+/* ---------- Planner & schedule ---------- */
 
 const PlannerUI = {
   init() {
-    const grid = $('#planner-grid');
-    grid.addEventListener('change', (e) => {
+    $('#planner-grid').addEventListener('change', (e) => {
       const { day, slot } = e.target.dataset;
       state.plan[day][slot] = e.target.value;
       Storage.save(Storage.KEYS.plan, state.plan);
@@ -1787,9 +2262,7 @@ const PlannerUI = {
       if (!window.confirm('Clear every meal from this week?')) return;
       DAYS.forEach((day) => MEAL_SLOTS.forEach((slot) => { state.plan[day][slot.id] = ''; }));
       Storage.save(Storage.KEYS.plan, state.plan);
-      this.render();
-      App.renderNutrition();
-      GroceryUI.render();
+      App.renderAll();
       announce('Weekly plan cleared.');
     });
   },
@@ -1797,11 +2270,9 @@ const PlannerUI = {
   render() {
     const labels = new Map(state.recipes.map((r) => {
       const { isSafe, flagged } = analyzeForUser(r);
-      const allergens = [...new Set(flagged.filter((f) => !f.substitute).flatMap((f) => f.allergens))]
-        .map((a) => ALLERGEN_BY_ID[a].label.toLowerCase());
       let suffix = '';
-      if (!isSafe) suffix = ` (contains ${allergens.join(', ')})`;
-      else if (flagged.length) suffix = ' (allergy-safe swaps)';
+      if (!isSafe) suffix = ` (unavailable: contains ${blockedHits(flagged).map((t) => RESTRICTIONS[t].label.toLowerCase()).join(', ')})`;
+      else if (flagged.length) suffix = ' (with swaps)';
       return [r.id, { text: `${r.title}${suffix}`, disabled: !isSafe }];
     }));
     const options = (selected) => ['<option value="">— No meal —</option>',
@@ -1821,12 +2292,66 @@ const PlannerUI = {
   },
 };
 
+const ScheduleUI = {
+  init() {
+    $('#supplement-options').innerHTML = SUPPLEMENTS.map((s) => `
+      <div class="check">
+        <input type="checkbox" id="supp-${s.id}" name="supplements" value="${s.id}">
+        <label for="supp-${s.id}">${s.label}</label>
+      </div>`).join('');
+    $('#supplement-form').addEventListener('change', (e) => {
+      if (e.target.matches('[data-day-select]')) return;
+      state.supplements = {
+        selected: [...document.querySelectorAll('input[name="supplements"]:checked')].map((i) => i.value),
+        coffeeAtBreakfast: $('#coffee-breakfast').checked,
+      };
+      Storage.save(Storage.KEYS.supplements, state.supplements);
+      this.render(mealsForDay(state.viewDay));
+      GroceryUI.render();
+    });
+  },
+
+  syncForm() {
+    document.querySelectorAll('input[name="supplements"]').forEach((box) => { box.checked = state.supplements.selected.includes(box.value); });
+    $('#coffee-breakfast').checked = state.supplements.coffeeAtBreakfast;
+  },
+
+  render(meals) {
+    const { selected, coffeeAtBreakfast } = state.supplements;
+    const schedule = ScheduleOptimizer.build(meals, selected, coffeeAtBreakfast);
+    $('#timeline').innerHTML = MEAL_SLOTS.map((slot) => {
+      const meal = meals[slot.id];
+      let mealText = '<p class="timeline__meal timeline__meal--empty">No meal planned</p>';
+      if (meal?.blocked) {
+        mealText = `<p class="timeline__meal">${escapeHTML(meal.recipe.title)}</p>
+          <p class="meta">${SubstitutionEngine.badge(blockedHits(meal.flagged), { blocked: true })} No safe substitute, so this meal is excluded. Choose another recipe.</p>`;
+      } else if (meal) {
+        const swaps = meal.flagged.map((f) => (f.substitute.name === 'Omit' ? `${f.original.toLowerCase()} omitted` : `${f.substitute.name} for ${f.original.toLowerCase()}`));
+        mealText = `<p class="timeline__meal">${escapeHTML(meal.recipe.title)}</p>
+          <p class="meta">${fmt(meal.nutrients.calories)} kcal · ${fmt(meal.nutrients.protein)} g protein · ${fmt(meal.nutrients.fat)} g fat · ${fmt(meal.nutrients.vitaminC)} mg vitamin C</p>
+          ${swaps.length ? `<p class="meta">Swaps: ${escapeHTML(swaps.join('; '))}.</p>` : ''}`;
+      }
+      const tips = ScheduleOptimizer.mealTips(slot.id, meal?.blocked ? null : meal, coffeeAtBreakfast);
+      const supps = schedule[slot.id].length
+        ? `<ul class="supp-list">${schedule[slot.id].map((s) => `<li><strong>${SUPPLEMENT_BY_ID[s.id].label}</strong>: ${escapeHTML(s.reason)}</li>`).join('')}</ul>`
+        : '';
+      const tipList = tips.length ? `<ul class="tip-list">${tips.map((t) => `<li>${t}</li>`).join('')}</ul>` : '';
+      return `
+        <li class="timeline__item">
+          <article class="card">
+            <h3 class="timeline__heading"><time datetime="${slot.time}">${slot.display}</time> <span class="timeline__slot">${slot.label}</span></h3>
+            ${mealText}${supps}${tipList}
+          </article>
+        </li>`;
+    }).join('');
+  },
+};
+
 /* ---------- Grocery list ---------- */
 
 const GroceryUI = {
   init() {
     const household = $('#household-size');
-    this.syncForm();
     household.addEventListener('change', () => {
       const value = Math.min(12, Math.max(1, Math.round(Number(household.value) || 1)));
       household.value = value;
@@ -1835,7 +2360,6 @@ const GroceryUI = {
       this.render();
       announce(`Grocery quantities updated for ${value} ${value === 1 ? 'person' : 'people'}.`);
     });
-
     $('#grocery-list').addEventListener('change', (e) => {
       const checked = new Set(state.grocery.checked);
       if (e.target.checked) checked.add(e.target.value);
@@ -1844,7 +2368,6 @@ const GroceryUI = {
       Storage.save(Storage.KEYS.grocery, state.grocery);
       this.updateProgress();
     });
-
     $('#uncheck-all').addEventListener('click', () => {
       state.grocery.checked = [];
       Storage.save(Storage.KEYS.grocery, state.grocery);
@@ -1861,7 +2384,6 @@ const GroceryUI = {
       : `Next shopping day: ${sunday.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.`;
   },
 
-  /** Reflects the active user's household size in the form. */
   syncForm() {
     $('#household-size').value = state.grocery.household;
   },
@@ -1878,13 +2400,14 @@ const GroceryUI = {
     list.innerHTML = groups.map((group) => `
       <fieldset class="card aisle">
         <legend>${group.aisle} <span class="aisle__count">(${group.items.length})</span></legend>
-        <ul class="aisle__items">
+        <ul>
           ${group.items.map((item) => {
             const id = `g-${item.key.replace(/[^a-z0-9-]/gi, '-')}`;
+            const swap = item.replaces?.size ? ` <span class="grocery__swap">swap for ${escapeHTML([...item.replaces].join(', '))}</span>` : '';
             return `
               <li class="check check--grocery">
                 <input type="checkbox" id="${id}" value="${escapeHTML(item.key)}" ${checked.has(item.key) ? 'checked' : ''}>
-                <label for="${id}"><span class="grocery__name">${escapeHTML(item.name)}${item.replaces?.size ? ` <span class="grocery__swap">allergy-safe swap for ${escapeHTML([...item.replaces].join(', '))}</span>` : ''}</span> <span class="grocery__qty">${escapeHTML(item.amount)}</span></label>
+                <label for="${id}"><span class="grocery__name">${escapeHTML(item.name)}${swap}</span> <span class="grocery__qty">${escapeHTML(item.amount)}</span></label>
               </li>`;
           }).join('')}
         </ul>
@@ -1899,123 +2422,54 @@ const GroceryUI = {
   },
 };
 
-/* ---------- Account ---------- */
+/* ---------- Profile drawer (native modal <dialog>: focus trap + Escape built in) ---------- */
 
-const AccountUI = {
-  email: null,
-
-  /** Restores a saved session before other controllers read state. */
+const ProfileDrawer = {
   init() {
-    const restored = AccountManager.restoreSession();
-    if (restored) {
-      this.email = restored;
-      Storage.scope = restored;
-      Object.assign(state, loadUserData());
-    }
-    this.renderState();
-
-    $('#account-form').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.submit();
+    const dialog = $('#profile-drawer');
+    $('#profile-button').addEventListener('click', () => {
+      this.render();
+      dialog.showModal();
     });
-    $('#btn-logout').addEventListener('click', () => this.signOut());
-    $('#btn-delete-account').addEventListener('click', () => this.deleteAccount());
-
-    const toggle = $('#toggle-password');
-    toggle.addEventListener('click', () => {
-      const show = toggle.getAttribute('aria-pressed') !== 'true';
-      $('#user-password').type = show ? 'text' : 'password';
-      toggle.setAttribute('aria-pressed', String(show));
+    $('#drawer-close').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog.close(); // backdrop click
+    });
+    $('#drawer-edit').addEventListener('click', () => {
+      dialog.close();
+      OnboardingWizard.start('edit');
+    });
+    $('#drawer-signout').addEventListener('click', () => App.signOut());
+    $('#drawer-delete').addEventListener('click', () => {
+      const { email } = state.account;
+      if (!window.confirm(`Permanently delete the account ${email} and all of its saved data on this device?`)) return;
+      AuthManager.deleteAccount(email);
+      App.signOut(`Account ${email} and its data were deleted.`);
     });
   },
 
-  setError(id, message) {
-    $(`#${id}`).setAttribute('aria-invalid', String(Boolean(message)));
-    $(`#${id}-error`).textContent = message;
+  renderButton() {
+    const { fullName } = state.account;
+    const c = NutritionEngine.bodyComposition(state.profile);
+    $('#profile-initials').textContent = fullName.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+    $('#profile-button-name').textContent = firstName();
+    $('#profile-button-stats').textContent = `BMI ${fmt(c.bmi)}${c.waistToHip ? ` · WHR ${c.waistToHip.toFixed(2)}` : ''}`;
   },
 
-  validate() {
-    const email = $('#user-email');
-    const password = $('#user-password');
-    const emailOk = email.value.trim() !== '' && email.validity.valid;
-    const passwordOk = password.value.length >= 8;
-    this.setError('user-email', emailOk ? '' : 'Enter an email address like you@example.com.');
-    this.setError('user-password', passwordOk ? '' : 'Use at least 8 characters.');
-    if (!emailOk) return email;
-    return passwordOk ? null : password;
-  },
-
-  async submit() {
-    const invalid = this.validate();
-    if (invalid) {
-      invalid.focus();
-      announce('Please fix the highlighted account fields.');
-      return;
-    }
-    const button = $('#btn-create-account');
-    const password = $('#user-password');
-    button.disabled = true;
-    button.textContent = 'Checking…';
-    try {
-      const { email, created } = await AccountManager.signInOrCreate($('#user-email').value, password.value);
-      if (created) {
-        Storage.scope = email;
-        saveUserData(); // the new account starts with the guest's current plan
-      }
-      Storage.save(Storage.KEYS.session, email);
-      $('#account-form').reset();
-      this.activate(email);
-      announce(created
-        ? `Account created for ${email}. Your current profile and meal plan were copied into it.`
-        : `Signed in as ${email}. Your saved profile and meal plan are loaded.`);
-    } catch (error) {
-      if (error.message === 'wrong-password') {
-        this.setError('user-password', 'That password does not match this email. Try again.');
-        password.select();
-        password.focus();
-      } else {
-        this.setError('user-email', 'Accounts need a secure (https) connection and a modern browser.');
-      }
-    } finally {
-      button.disabled = false;
-      button.textContent = 'Create account / Sign in';
-      password.type = 'password';
-      $('#toggle-password').setAttribute('aria-pressed', 'false');
-    }
-  },
-
-  activate(email) {
-    this.email = email;
-    Storage.scope = email;
-    App.reloadUserData();
-    this.renderState();
-    $('#account-status').focus();
-  },
-
-  signOut(message) {
-    Storage.remove(Storage.KEYS.session);
-    const previous = this.email;
-    this.email = null;
-    Storage.scope = null;
-    App.reloadUserData();
-    this.renderState();
-    $('#user-email').focus();
-    announce(message ?? `Signed out of ${previous}. You are now browsing as a guest.`);
-  },
-
-  deleteAccount() {
-    const { email } = this;
-    if (!window.confirm(`Permanently delete the account ${email} and all of its saved data on this device?`)) return;
-    AccountManager.deleteAccount(email);
-    this.signOut(`Account ${email} and its data were deleted.`);
-  },
-
-  renderState() {
-    const signedIn = Boolean(this.email);
-    $('#logged-out-view').hidden = signedIn;
-    $('#logged-in-view').hidden = !signedIn;
-    $('#display-user-email').textContent = this.email ?? '';
-    $('#account-chip-label').textContent = signedIn ? this.email : 'Sign in';
+  render() {
+    const { profile, account } = state;
+    $('#drawer-name').textContent = account.fullName;
+    $('#drawer-email').textContent = account.email;
+    $('#drawer-body').innerHTML = TargetsUI.bodyRows()
+      .map(([label, value, note]) => `<div><dt>${label}</dt><dd>${value} <span class="meta">${note}</span></dd></div>`).join('');
+    const allergies = profile.allergies.map((a) => RESTRICTIONS[a].label).join(', ') || 'None';
+    const prefs = [
+      ['Goal', `${NutritionEngine.GOALS[profile.goal].label}${profile.goal === 'maintain' ? '' : `, ${profile.timelineWeeks} weeks`}`],
+      ['Diet', DIETS[profile.diet].label],
+      ['Allergies', allergies],
+      ['Daily target', `${fmt(currentTargets().targets.calories)} kcal`],
+    ];
+    $('#drawer-prefs').innerHTML = prefs.map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHTML(value)}</dd></div>`).join('');
   },
 };
 
@@ -2041,46 +2495,118 @@ const ThemeUI = {
   },
 };
 
-/* ---------- App bootstrap ---------- */
+/* ---------- App bootstrap & view routing ---------- */
 
 const App = {
+  importer: null,
+  tabs: null,
+  VIEWS: {
+    auth: { el: '#auth-view', heading: '#auth-title', title: 'Ube Café Nutrition Planner: Meal Plans, Macro Targets & Grocery Lists' },
+    onboarding: { el: '#onboarding-view', heading: '#wizard-title', title: 'Set up your profile · Ube Café' },
+    app: { el: '#app-view', heading: '#app-title', title: 'Your meal plan · Ube Café' },
+  },
+
   init() {
     ThemeUI.init();
-    AccountUI.init();
-    ProfileUI.init();
+    AuthView.init();
+    OnboardingWizard.init();
+    ProfileDrawer.init();
     DashboardUI.init();
-    ScheduleUI.init();
-    RecipeUI.init();
+    RecipeLibrary.init();
     PlannerUI.init();
+    ScheduleUI.init();
     GroceryUI.init();
+    this.importer = new RecipeImporter($('#library-importer'), {
+      prefix: 'lib',
+      onSaved: (recipe, isUpdate) => {
+        this.renderAll();
+        announce(`${isUpdate ? 'Updated' : 'Saved'} “${recipe.title}”. It is now available in the weekly planner.`);
+      },
+    });
+    this.tabs = new Tabs($('#app-tablist'), {
+      onChange: (id) => {
+        state.ui = { ...state.ui, tab: id };
+        if (state.account) Storage.save(Storage.KEYS.ui, state.ui);
+      },
+    });
     $('#year').textContent = String(new Date().getFullYear());
-    this.renderRecipesChanged();
+
+    const email = AuthManager.restoreSession();
+    if (email) this.enter(email, { focus: false });
+    else this.showView('auth', { focus: false });
   },
 
-  /** Swaps in the active scope's data (after sign-in / sign-out) and refreshes every view. */
-  reloadUserData() {
-    Object.assign(state, loadUserData(), { editingId: null });
-    RecipeUI.resetForm();
-    ProfileUI.fill(state.profile);
+  /** Loads a signed-in account and routes to onboarding or the dashboard. */
+  enter(email, { focus = true } = {}) {
+    Storage.scope = email;
+    state.account = { email, ...AuthManager.account(email) };
+    Object.assign(state, loadUserData());
+    if (!Storage.load(Storage.KEYS.recipes, null)) {
+      // First sign-in: persist the sample library and plan for this account.
+      Storage.save(Storage.KEYS.recipes, state.recipes);
+      Storage.save(Storage.KEYS.plan, state.plan);
+    }
+    if (state.profile.onboarded) this.showApp({ focus });
+    else OnboardingWizard.start('onboarding');
+  },
+
+  showView(name, { focus = true } = {}) {
+    Object.entries(this.VIEWS).forEach(([key, view]) => { $(view.el).hidden = key !== name; });
+    $('#profile-button').hidden = name !== 'app';
+    document.title = this.VIEWS[name].title;
+    window.scrollTo(0, 0);
+    if (focus) $(this.VIEWS[name].heading).focus();
+  },
+
+  showApp({ focus = true } = {}) {
     ScheduleUI.syncForm();
     GroceryUI.syncForm();
-    this.renderRecipesChanged();
+    this.importer.reset();
+    $('#app-name').textContent = firstName();
+    this.renderAll();
+    this.showView('app', { focus });
+    this.tabs.select(state.ui.tab);
   },
 
-  /** Re-renders everything derived from profile targets and the viewed day. */
-  renderNutrition() {
-    ProfileUI.renderTargets();
-    const day = DashboardUI.render();
-    RecommendationsUI.render(day);
-    ScheduleUI.render(day.meals);
+  setViewDay(day) {
+    state.viewDay = day;
+    document.querySelectorAll('[data-day-select]').forEach((select) => { select.value = day; });
+    this.renderNutrition();
   },
 
-  /** Re-renders views that list recipes, then everything downstream. */
-  renderRecipesChanged() {
-    RecipeUI.renderLibrary();
+  /** Re-renders every recipe-dependent view. */
+  renderAll() {
+    RecipeLibrary.render();
     PlannerUI.render();
     this.renderNutrition();
     GroceryUI.render();
+  },
+
+  /** Re-renders everything derived from targets and the viewed day. */
+  renderNutrition() {
+    document.querySelectorAll('[data-day-select]').forEach((select) => { select.value = state.viewDay; });
+    TargetsUI.render();
+    const day = DashboardUI.render();
+    RecommendationsUI.render(day);
+    ScheduleUI.render(day.meals);
+    ProfileDrawer.renderButton();
+    const { profile } = state;
+    $('#app-summary').textContent = `${NutritionEngine.GOALS[profile.goal].label} · ${DIETS[profile.diet].label} · ${fmt(currentTargets().targets.calories)} kcal a day`;
+  },
+
+  signOut(message) {
+    const dialog = $('#profile-drawer');
+    if (dialog.open) dialog.close();
+    const name = state.account ? firstName() : '';
+    AuthManager.signOut();
+    Storage.scope = null;
+    state.account = null;
+    // Clear the previous user's rendered data from the hidden app view.
+    ['#macro-list', '#micro-list', '#recommendation-list', '#targets-output', '#recipe-library', '#planner-grid', '#timeline', '#grocery-list']
+      .forEach((sel) => { $(sel).innerHTML = ''; });
+    AuthView.reset();
+    this.showView('auth');
+    announce(message ?? `Signed out${name ? `. See you soon, ${name}` : ''}.`);
   },
 };
 
