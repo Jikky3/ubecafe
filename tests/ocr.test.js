@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   canonicalHeading, cleanOcrText, fitWithin, hasReadableText, overallProgress, MAX_PIXELS, MAX_SIDE, OCR_SOURCES,
 } from '../js/engines/ocr.js';
-import { RecipeParser } from '../js/engines/recipe-parser.js';
+import { RecipeManager } from '../js/engines/recipe-manager.js';
 
 test('fitWithin leaves small images alone', () => {
   assert.deepEqual(fitWithin(800, 600), { width: 800, height: 600, scale: 1 });
@@ -132,7 +132,7 @@ test('cleaned OCR text parses into a recipe', () => {
     'cool.',
     '2. Toss everything together.',
   ].join('\n');
-  const parsed = RecipeParser.parseRecipeText(cleanOcrText(raw));
+  const parsed = RecipeManager.parseRecipeText(cleanOcrText(raw));
   assert.equal(parsed.title, 'Kale & Chickpea Power Salad');
   assert.equal(parsed.servings, 2);
   assert.deepEqual(parsed.ingredientsText.split('\n'), ['3 cups kale', '1 can chickpeas, drained', '1/2 cup quinoa']);

@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { BackupEngine, BackupError, ENCRYPTED_FORMAT, fromBase64, toBase64 } from '../js/engines/backup.js';
-import { CURRENT_SCHEMA_VERSION } from '../js/migrations.js';
+import { CURRENT_SCHEMA_VERSION, MIGRATIONS } from '../js/migrations.js';
 
 const root = path.resolve(import.meta.dirname, '..');
 const FAST = { iterations: 100000 }; // the minimum accepted; keeps the suite quick
 
 const sampleData = () => ({
-  profile: { units: 'metric', age: 41, gender: 'male', heightCm: 180, weightKg: 80 },
+  profile: { units: 'metric', age: 41, sex: 'male', heightCm: 180, weightKg: 80 },
   recipes: [
     { id: 'r1', title: 'Café Soup', servings: 2, ingredientsText: '1 cup lentils', instructions: 'Simmer.' },
     { id: 'r2', title: 'Toast', servings: 1, ingredientsText: '1 slice bread', instructions: '' },
@@ -46,8 +46,14 @@ describe('plain backups', () => {
     assert.deepEqual(data, sampleData());
     assert.deepEqual(summary, {
       exportedAt: '2026-10-07T08:30:00.000Z', account: 'me@x.org', hasProfile: true, recipes: 2,
-      plannedMeals: 3, supplements: 2, groceryChecked: 1, customFoods: 1, otherKeys: [],
+      plannedMeals: 3, supplements: 2, groceryChecked: 1, customFoods: 1, hasUiState: false, otherKeys: [],
     });
+  });
+
+  test('summary reports saved UI state separately from other keys', () => {
+    const summary = BackupEngine.summarize({ ...sampleData(), ui: { tab: 'tab-grocery' }, extra: 1 });
+    assert.equal(summary.hasUiState, true);
+    assert.deepEqual(summary.otherKeys, ['extra']);
   });
 
   test('device-wide and unsafe keys never enter a backup or an import', () => {
@@ -63,8 +69,15 @@ describe('plain backups', () => {
   test('unversioned (v0) backups are migrated on import', () => {
     const legacy = { app: 'ubecafe', format: 'ubecafe-backup', schemaVersion: 0, exportedAt: null, data: { plan: { monday: { lunch: 'r1' } } } };
     const { data, applied } = BackupEngine.prepareImport(BackupEngine.parse(JSON.stringify(legacy)));
-    assert.deepEqual(applied, [1]);
+    assert.deepEqual(applied, MIGRATIONS.map((m) => m.version));
     assert.deepEqual(data.plan.monday, { breakfast: '', lunch: 'r1', snack: '', dinner: '' });
+  });
+
+  test('v1 backups with a legacy `gender` profile are imported with `sex`', () => {
+    const legacy = { app: 'ubecafe', format: 'ubecafe-backup', schemaVersion: 1, exportedAt: null, data: { profile: { age: 41, gender: 'male' } } };
+    const { data, applied } = BackupEngine.prepareImport(BackupEngine.parse(JSON.stringify(legacy)));
+    assert.deepEqual(applied, [2]);
+    assert.deepEqual(data.profile, { age: 41, sex: 'male' });
   });
 
   test('rejects files that are not usable backups', () => {

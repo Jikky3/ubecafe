@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { RecipeMatcher } from '../js/engines/recipe-match.js';
+import { RecipeManager } from '../js/engines/recipe-manager.js';
 import { NUTRIENT_KEYS } from '../js/data/nutrients.js';
 
 const nutrients = (values) => Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, values[k] ?? 0]));
@@ -41,6 +42,12 @@ test('rankRecipes favours the richest recipes and lists planned ones last', () =
   ];
   const ranked = RecipeMatcher.rankRecipes(recipes, 'iron', { direction: 'increase', target: 18, limit: 3 });
   assert.equal(ranked[0].recipe.id, 'spinach');
+  ranked.forEach((r) => {
+    const { perServing } = RecipeManager.analyze(r.recipe);
+    assert.equal(r.amount, perServing.iron, 'amounts come from RecipeManager.analyze');
+    assert.equal(r.calories, perServing.calories);
+    assert.equal(r.pctOfTarget, Math.round((perServing.iron / 18) * 100));
+  });
   const varied = RecipeMatcher.rankRecipes(recipes, 'iron', { direction: 'increase', target: 18, excludeIds: ['spinach'], limit: 3 });
   assert.equal(varied.at(-1).recipe.id, 'spinach');
 });
