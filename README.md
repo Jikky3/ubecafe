@@ -15,42 +15,59 @@ See [ROADMAP.md](ROADMAP.md) for where the project is headed.
 
 ## Features
 
-- **Targets**: BMR and TDEE (Mifflin-St Jeor × activity factor), goal-adjusted
-  calories with safety floors (1,200 kcal, or 1,500 kcal for men), protein,
-  fat, carbohydrate, sugar and fiber, plus age- and sex-specific RDAs.
-- **Body composition** (optional): BMI, waist-to-hip and waist-to-height
-  ratios, lean mass and Katch-McArdle BMR.
-- **Recipe analysis**: paste a recipe and each ingredient line is parsed into
-  a quantity, unit and food, then totaled per serving.
-- **Weekly plan and dashboard**: a meal per slot per day, with that day's
+- **Accounts and onboarding**: create a local account, then a four-step
+  wizard collects goals and timeline, diet pattern and allergies, biometrics
+  (with optional body fat, waist, hip and lean mass) and a first recipe. A
+  reload resumes the current step.
+- **Targets**: BMR and TDEE (Mifflin-St Jeor × activity factor), goal- and
+  timeline-adjusted calories with safety floors (1,200 kcal, or 1,500 kcal for
+  men), protein, fat, carbohydrate (a 30 g keto split when chosen), sugar and
+  fiber, plus age- and sex-specific RDAs and a projected weight change.
+- **Allergies and diets**: peanuts, tree nuts, dairy, gluten, soy, eggs and
+  shellfish, plus vegetarian, vegan, pescatarian, keto and paleo patterns.
+  Each conflicting ingredient is swapped for a nutritionally similar, safe
+  substitute; recipes with an allergen that has no safe swap are kept out of
+  the plan, dashboard and grocery list.
+- **Recipes**: paste a recipe or scan a photo (read on your device with
+  Tesseract.js; the photo is never uploaded). Ingredient lines are parsed into
+  quantities, units and foods and totaled per serving, with swaps applied.
+- **Cook-along recipe view**: opens from the planner, the day's timeline, the
+  library and the suggestion cards, with tick-off ingredients and steps,
+  per-serving nutrition, inline swaps and the supplements that go with that
+  meal. Every recipe has a link (`#recipe/<id>`).
+- **Weekly plan and dashboard**: a meal per slot per day, with the day's
   intake compared against your targets.
-- **Recommendations**: "which food and why" rules for each gap or excess.
+- **Suggestions**: "which food and why" rules for each gap or excess, with how
+  far off you are, which planned meals drive the nutrient and the best safe
+  recipes from your library.
 - **Supplement timing**: fat-soluble supplements go with your highest-fat
   meal; iron goes with vitamin C and is kept away from coffee, calcium and
   zinc; magnesium goes with dinner.
-- **Grocery list**: the week's ingredients, scaled to your household size and
-  grouped by aisle.
-- **Local accounts**: several people can share one browser, each with
-  separate data.
-
-Photo import is a **demo**: the "scan a recipe photo" step does not yet read
-your image and returns a built-in sample recipe instead.
+- **Grocery list**: the week's ingredients (substitutes included), scaled to
+  your household size and grouped by aisle.
+- **Backups and offline use**: export everything to a file (optionally
+  passphrase-encrypted), restore it on any device, and install the app to use
+  it offline.
 
 ## Privacy model
 
 - **Your data stays on your device.** Profiles, recipes, plans and settings
-  are saved in your browser's `localStorage`. The app has no backend, no
-  analytics and no tracking, and it never uploads anything you enter.
+  are saved in your browser's IndexedDB (falling back to `localStorage`). The
+  app has no backend, no analytics and no tracking, and it never uploads
+  anything you enter.
 - **Accounts are local.** An account separates people who share one browser.
   Passwords are salted and stretched with PBKDF2-SHA-256 (Web Crypto, 210,000
   iterations), and only the hash is stored. This keeps people's data apart; it
-  is not server-grade security. The nutrition data itself is **not
-  encrypted**, so anyone with access to the browser's storage can read it.
-- **Clearing your browser data deletes everything.** There is no export or
-  backup yet (planned in Phase 2 of the roadmap).
-- **One third-party request:** the page loads its web fonts from Google
-  Fonts, so Google receives a normal font request (including your IP address)
-  when the page opens. No personal data is sent with it.
+  is not server-grade security. Saved nutrition data is **not encrypted** in
+  the browser, so anyone with access to its storage can read it.
+- **Back up before clearing your browser.** Clearing site data deletes
+  everything; use **Profile → Back up & restore** to keep a copy. Backups can
+  be encrypted with a passphrase (AES-GCM, PBKDF2-derived key).
+- **Third-party downloads, no personal data:** the page loads its web fonts
+  from Google Fonts, and the first photo scan downloads the OCR engine and
+  English language data (about 5 MB) from jsDelivr. Both are ordinary file
+  requests (they reveal your IP address to those services); your photos and
+  data are never sent.
 
 ## Running locally
 
@@ -77,7 +94,8 @@ npm install
 |---------|----------------|
 | `npm test` | Unit tests for the engines (`tests/*.test.js`, Node's built-in `node:test`). No browser needed. |
 | `npm run lint:html` | Validates `index.html` with [html-validate](https://html-validate.org/) (`html-validate:recommended`). |
-| `npm run test:browser` | Loads the app in headless Chromium, fails on console errors or missing sections, and runs [axe-core](https://github.com/dequelabs/axe-core) in the light and dark themes, failing on any serious or critical WCAG 2.1 A/AA violation. |
+| `npm run test:browser` | In headless Chromium, signs up, completes onboarding and opens every tab, failing on console errors or missing sections; runs [axe-core](https://github.com/dequelabs/axe-core) on each screen in the light and dark themes and fails on any serious or critical WCAG 2.1 A/AA violation. |
+| `npm run test:ocr` | End-to-end photo OCR check in headless Chromium (needs network access to jsDelivr, or `OCR_PACKAGES_DIR` pointing at local copies of the pinned packages). |
 
 The browser check needs a Chromium build. Either let Playwright download one:
 
@@ -109,26 +127,37 @@ next to the markup they cover.
 ## Project structure
 
 ```
-index.html            Page markup (single page, sectioned)
+index.html            Page markup: sign-in view, onboarding wizard, tabbed app, dialogs
 styles.css            All styles, with light and dark themes
+sw.js                 Service worker (offline app shell)
+manifest.webmanifest  Install metadata; icons/ holds the app icons
 js/
-  main.js             Entry point: wires the UI modules together
-  state.js            In-memory app state and per-user data loading
-  storage.js          localStorage wrapper, namespaced per account
+  main.js             Entry point: storage init, view routing, tabs, wiring
+  state.js            In-memory app state and per-account data loading
+  storage.js          IndexedDB-backed key-value store with a synchronous cache
+  migrations.js       Ordered schema migrations for saved data and backups
   util.js             Shared helpers (formatting, nutrient math, DOM helpers)
-  data/               Constants, nutrient list, food table, seed recipes
+  data/               Nutrient list, food table, allergy/diet rules and
+                      substitutes, constants, seed recipes
   engines/            Pure logic, importable in Node without a DOM:
-    biometrics.js       targets, RDAs, body composition
-    recipe-parser.js    ingredient lines to grams and nutrients
+    nutrition.js        targets, pace, RDAs, body composition
+    recipe-manager.js   ingredient lines to grams and nutrients
+    substitution.js     allergy and diet screening with safe swaps
     recommendations.js  "which food and why" rules
+    recipe-match.js     links nutrient gaps to planned meals and recipes
     schedule.js         supplement timing rules
     grocery.js          weekly grocery roll-up
-    accounts.js         local accounts (PBKDF2 via Web Crypto)
-  ui/                 One module per page section (DOM rendering and events)
+    auth.js             local accounts (PBKDF2 via Web Crypto)
+    backup.js           export, import and encrypted backups
+    ocr.js              on-device OCR (Tesseract.js) and text cleanup
+  ui/                 One module per view or panel (DOM rendering and events)
 tests/                Unit tests (node:test) and test helpers
 tools/
   serve.js            Static dev server (npm start)
+  flows.js            Shared sign-up/onboarding steps for browser checks
   browser-check.js    Headless Chromium smoke and accessibility check
+  ocr-check.js        End-to-end OCR check
+  make-icons.js       Regenerates icons/ from the SVG mark
 .github/workflows/    CI and GitHub Pages deployment
 ```
 

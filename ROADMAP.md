@@ -1,6 +1,12 @@
 # Ube Café — Development Roadmap
 
-_Status as of October 2026 (commit `f2628ac`)._
+_Written October 2026 against commit `f2628ac`; progress is ticked below._
+
+> **Update:** the main repository (`julianaviado/ubecafe`) has since added
+> local sign-in, a four-step onboarding wizard, a tabbed layout, allergen
+> screening and diet patterns with safe substitutions. This branch is rebuilt
+> on that version: the code is split into modules and the work below is
+> ported onto it.
 
 ## Where the project is
 
@@ -81,12 +87,12 @@ Other gaps:
 
 Goal: make the project safe to change.
 
-- [ ] Add `README.md` (purpose, how to run, privacy model, data sources) and a `LICENSE`.
-- [ ] Split `script.js` into ES modules (`data/`, `engines/`, `ui/`) loaded with `<script type="module">`; still no build step.
-- [ ] Add unit tests (Node's built-in `node:test`) for the parser, targets, recommendations, schedule and grocery roll-up. Seed them with the failing cases in the table above.
-- [ ] GitHub Actions: run the tests and an HTML/accessibility check on every PR; deploy to GitHub Pages from `main`.
+- [x] Add `README.md` (purpose, how to run, privacy model, data sources). A `LICENSE` is still the owner's decision.
+- [x] Split `script.js` into ES modules (`data/`, `engines/`, `ui/`) loaded with `<script type="module">`; still no build step.
+- [x] Add unit tests (Node's built-in `node:test`) for the parser, targets, recommendations, schedule and grocery roll-up. Seed them with the failing cases in the table above.
+- [x] GitHub Actions: run the tests and an HTML/accessibility check on every PR; deploy to GitHub Pages from `main`.
 - [ ] Decide which repository is canonical and fix the canonical/OG URLs to match.
-- [ ] Label the photo import as a demo in the UI.
+- [x] ~~Label the photo import as a demo in the UI.~~ Superseded: photo import now does real on-device OCR.
 
 ### Phase 1 — Accurate nutrition data (2–4 weeks)
 
@@ -114,8 +120,8 @@ Goal: never lose a user's work.
 Goal: from tracking what you planned to helping you plan.
 
 - [ ] Adjustable portions, more than one item per meal slot, and custom meal times.
-- [ ] Dietary preferences and allergies (vegetarian, vegan, gluten-free, nut-free) that filter recommendations and recipes.
-- [ ] Turn recommendations from food names into **ranked recipes** from the user's own library that close the day's biggest gaps.
+- [x] Dietary preferences and allergies that filter recommendations and recipes (delivered upstream: allergen screening, diet patterns and safe substitutions).
+- [x] Turn recommendations from food names into **ranked recipes** from the user's own library that close the day's biggest gaps.
 - [ ] Rule-based "auto-fill my week" that meets targets within limits, keeping the rules readable and every choice explained.
 - [ ] Weekly view of averages, since most micronutrient targets are meant to be met over days, not within one day.
 - [ ] Grocery list: merge with pantry stock, show amounts in package sizes, and export as text or for printing.
