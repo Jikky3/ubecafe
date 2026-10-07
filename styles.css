@@ -1720,3 +1720,12 @@ textarea {
     outline: 2px solid Highlight;
   }
 }
+
+/* Photo OCR controls inside each recipe importer (js/ui/ocr.js). */
+.ocr-actions {
+  margin-top: var(--space-3);
+}
+
+.ocr-preview-host:empty {
+  display: none;
+}
