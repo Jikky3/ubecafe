@@ -53,11 +53,13 @@ export const DashboardUI = {
     const planned = Object.values(meals).filter((meal) => meal && !meal.blocked);
     const intake = planned.reduce((sum, m) => addNutrients(sum, m.nutrients), emptyNutrients());
     const { targets } = currentTargets();
-    const lowCount = NUTRIENTS.filter((m) => m.group === 'micro' && intake[m.key] < targets[m.key] * 0.8).length;
+    const lowCount = NUTRIENTS.filter((m) => m.group === 'micro' && !m.isLimit && intake[m.key] < targets[m.key] * 0.8).length;
+    const overLimits = NUTRIENTS.filter((m) => m.isLimit && intake[m.key] > targets[m.key]).map((m) => m.label.toLowerCase());
 
     $('#dashboard-summary').textContent =
       `${DAY_LABELS[state.viewDay]}: ${planned.length} of ${MEAL_SLOTS.length} meals planned, ${fmt(intake.calories)} kcal. ` +
-      `${lowCount} micronutrient${lowCount === 1 ? '' : 's'} below 80% of target.`;
+      `${lowCount} micronutrient${lowCount === 1 ? '' : 's'} below 80% of target. ` +
+      (overLimits.length ? `Over the daily limit for ${overLimits.join(', ')}.` : 'Every daily limit respected.');
     $('#macro-list').innerHTML = NUTRIENTS.filter((m) => m.group === 'macro').map((m) => this.row(m, intake[m.key], targets[m.key])).join('');
     $('#micro-list').innerHTML = NUTRIENTS.filter((m) => m.group === 'micro').map((m) => this.row(m, intake[m.key], targets[m.key])).join('');
     document.querySelectorAll('[data-day-label]').forEach((el) => { el.textContent = DAY_LABELS[state.viewDay]; });

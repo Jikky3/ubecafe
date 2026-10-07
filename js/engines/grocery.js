@@ -22,7 +22,7 @@ export class GroceryAggregator {
       analysis.ingredients.forEach((ing) => {
         if (ing.omitted) return;
         if (ing.foodId) {
-          const food = FOOD_DB[ing.foodId];
+          const food = ing.food ?? FOOD_DB[ing.foodId];
           const entry = items.get(food.id) ?? { key: food.id, name: food.name, aisle: food.aisle, grams: 0, food, replaces: new Set() };
           entry.grams += ing.grams * factor;
           if (ing.swappedFrom) entry.replaces.add(ing.swappedFrom.toLowerCase());

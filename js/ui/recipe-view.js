@@ -130,7 +130,7 @@ export const RecipeView = {
     const ingredientItems = ingredients.map((ing, i) => `
       <li class="check">
         <input type="checkbox" id="cook-ing-${i}">
-        <label for="cook-ing-${i}">${escapeHTML(ing.raw)}${ing.foodId || ing.swappedFrom || ing.omitted ? '' : ' <span class="badge badge--warn"><span aria-hidden="true">!</span> No nutrition data</span>'}${swapNote(ing)}</label>
+        <label for="cook-ing-${i}">${escapeHTML(ing.raw)}${ing.foodId || ing.swappedFrom || ing.omitted || ing.matchSource === 'ignored' ? '' : ' <span class="badge badge--warn"><span aria-hidden="true">!</span> No nutrition data</span>'}${swapNote(ing)}</label>
       </li>`).join('');
     const safetyNote = !isSafe
       ? `<p class="analysis__danger">${SubstitutionEngine.badge(blockedHits(flagged), { blocked: true })} This recipe contains an allergen with no safe substitute, so it is left out of your plan, dashboard and grocery list.</p>`

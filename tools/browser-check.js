@@ -41,7 +41,20 @@ for (const colorScheme of ['light', 'dark']) {
 
   errors.push(...await runAxe(page, label('sign in')));
   await signUpAndOnboard(page, {
-    onStep: async (step) => { errors.push(...await runAxe(page, label(`onboarding step ${step}`))); },
+    onStep: async (step) => {
+      if (step === 2) await page.check('#allergy-dairy');
+      if (step === 4) {
+        // Analyze a recipe with a swap, an unrecognized line and the custom food form, then scan it.
+        await page.fill('#ob-ingredients', '1/4 cup cheddar cheese\n1 tbsp gochujang\n1 cup cooked rice');
+        await page.click('#ob-analyze');
+        await page.locator('#ob-analysis tr.is-unmatched').waitFor();
+        if (colorScheme === 'light') {
+          checks['unmatched picker rendered'] = await page.locator('#ob-analysis select[data-match-key="gochujang"]').count() === 1;
+          checks['custom food form rendered'] = await page.locator('#ob-custom-name').isVisible();
+        }
+      }
+      errors.push(...await runAxe(page, label(`onboarding step ${step}`)));
+    },
   });
 
   if (colorScheme === 'light') {
@@ -49,6 +62,7 @@ for (const colorScheme of ['light', 'dark']) {
       'targets rendered': await page.locator('#targets-output .stat').count() > 0,
       'dashboard rendered': await page.locator('#macro-list .nutrient').count() > 0,
       'recipes rendered': await page.locator('#recipe-library .recipe-card').count() > 0,
+      'limits in dashboard summary': /daily limit/.test(await page.locator('#dashboard-summary').innerText()),
       'grocery rendered': await page.locator('#grocery-list .aisle').count() > 0,
     });
   }

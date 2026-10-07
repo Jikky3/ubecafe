@@ -10,6 +10,9 @@ export class NutritionEngine {
     gain: { label: 'Muscle gain', proteinPerKg: 2.0, fatShare: 0.25 },
   };
 
+  /** Sodium upper limit in mg/day: DGA 2020-2025 and AHA (NASEM Chronic Disease Risk Reduction intake, ages 14+). */
+  static SODIUM_LIMIT_MG = 2300;
+
   /** Shorter timelines use a larger (but capped) energy adjustment. */
   static TIMELINES = [4, 8, 12, 16, 24];
 
@@ -46,6 +49,7 @@ export class NutritionEngine {
       carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
     }
     const sugar = Math.min(carbs, Math.round((calories * 0.1) / 4)); // WHO: free sugars < 10 % of energy
+    const saturatedFat = Math.round((calories * 0.1) / 9); // DGA 2020-2025 / AHA: saturated fat < 10 % of energy
 
     // ~7,700 kcal per kg of body weight change.
     const weeklyKg = ((calories - tdee) * 7) / 7700;
@@ -55,8 +59,9 @@ export class NutritionEngine {
       pace: profile.goal === 'maintain' ? null : pace.label,
       projectedKg: profile.goal === 'maintain' ? 0 : weeklyKg * profile.timelineWeeks,
       targets: {
-        calories, protein, carbs, fat, sugar,
+        calories, protein, carbs, fat, saturatedFat, sugar,
         fiber: Math.round((14 * calories) / 1000), // IOM: 14 g per 1,000 kcal
+        sodium: this.SODIUM_LIMIT_MG,
         ...this.micronutrientRDA(profile.age, profile.sex),
       },
     };

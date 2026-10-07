@@ -13,7 +13,7 @@
  * installed copies keep serving the old files. Add new files to APP_SHELL
  * (tests/backup.test.js checks that every js/ module is listed).
  */
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE = `ubecafe-shell-${CACHE_VERSION}`;
 const FONT_CACHE = 'ubecafe-fonts-v1';
 const FONT_HOSTS = new Set(['fonts.googleapis.com', 'fonts.gstatic.com']);

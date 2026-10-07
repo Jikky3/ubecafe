@@ -25,6 +25,7 @@ export class RecommendationEngine {
     Chickpeas: ['legumes'],
     Banana: ['high_carb_fruit'],
     'Sweet Potato': ['starch'],
+    'No-Salt-Added Beans': ['legumes'],
   };
 
   /** Removes foods that clash with active restrictions; returns the safe names and the ones left out. */
@@ -80,6 +81,12 @@ export class RecommendationEngine {
     if (intake.fat > targets.fat * 1.15) {
       add('fat', 'Lean Proteins / Steamed Vegetables', 'Swap fried or oil-heavy sides for lean, steamed options to bring total fat back within range.');
     }
+    if (intake.saturatedFat > targets.saturatedFat) {
+      add('saturatedFat', 'Olive Oil / Avocado / Walnuts / Salmon', 'Cooking with unsaturated fats instead of butter, cream and cheese lowers LDL cholesterol; guidelines keep saturated fat under 10% of daily calories.', 'Olive Oil / Pumpkin Seeds');
+    }
+    if (intake.sodium > targets.sodium) {
+      add('sodium', 'Herbs & Spices / Lemon or Lime / No-Salt-Added Beans', 'Season with garlic, black pepper, herbs or citrus instead of salt, and choose no-salt-added canned beans, tomatoes and broth to stay under 2,300 mg of sodium a day.');
+    }
     if (intake.sugar > targets.sugar) {
       add('sugar', 'Fresh Berries / Plain Yogurt', 'Replace sweetened snacks with whole fruit and unsweetened dairy to cut added sugar while keeping sweetness.');
     }
@@ -104,7 +111,9 @@ export class RecommendationEngine {
       add('calcium', 'Greek Yogurt / Kale / Firm Tofu', 'Calcium-rich foods protect bone density; calcium-set tofu and kale are strong dairy-free options.');
     }
     if (ratio('potassium') < 0.7) {
-      add('potassium', 'Banana / Sweet Potato / Avocado', 'Potassium balances sodium to support healthy blood pressure and muscle contraction.');
+      add('potassium', 'Banana / Sweet Potato / Avocado', intake.sodium > targets.sodium
+        ? 'Your sodium is over its limit; potassium-rich foods help offset sodium’s effect on blood pressure.'
+        : 'Potassium balances sodium to support healthy blood pressure and muscle contraction.');
     }
     if (ratio('magnesium') < 0.7) {
       add('magnesium', 'Pumpkin Seeds / Almonds', 'Among the densest magnesium sources, supporting sleep quality, muscle relaxation and energy metabolism.');
@@ -122,7 +131,7 @@ export class RecommendationEngine {
     if (recs.length === 0) {
       return [{
         food: 'Keep doing what you are doing',
-        reason: 'Every tracked macro and micronutrient is within range for this day. Maintain variety across the week.',
+        reason: 'Every tracked macro, micronutrient and limit is within range for this day. Maintain variety across the week.',
         trigger: 'All targets met',
         priority: 'info',
       }];

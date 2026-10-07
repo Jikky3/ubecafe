@@ -103,8 +103,8 @@ describe('GroceryAggregator.aggregate with restrictions', () => {
     const soy = items.find((i) => i.key === 'soy-milk');
     const oil = items.find((i) => i.key === 'olive-oil');
     assert.ok(soy && oil);
-    assert.deepEqual([...soy.replaces], ['milk']);
-    assert.deepEqual([...oil.replaces], ['butter']);
+    assert.deepEqual([...soy.replaces], [FOOD_DB.milk.name.toLowerCase()]);
+    assert.deepEqual([...oil.replaces], [FOOD_DB.butter.name.toLowerCase()]);
     assert.ok(Math.abs(oil.grams - 50 * 0.75) < 1e-9, 'gramRatio scales the bought amount');
     assert.equal(items.find((i) => i.key === 'spinach').replaces.size, 0);
   });
@@ -115,7 +115,7 @@ describe('GroceryAggregator.aggregate with restrictions', () => {
     const soy = items.filter((i) => i.key === 'soy-milk');
     assert.equal(soy.length, 1);
     assert.ok(Math.abs(soy[0].grams - (244 + 243)) < 1e-9, `${soy[0].grams} g`);
-    assert.deepEqual([...soy[0].replaces], ['milk']);
+    assert.deepEqual([...soy[0].replaces], [FOOD_DB.milk.name.toLowerCase()]);
   });
 
   it('leaves omitted ingredients off the list', () => {

@@ -66,6 +66,23 @@ describe('RecommendationEngine.recommend', () => {
     assert.ok(triggered(recommend({ fat: 1.2 }), 'Fat'));
   });
 
+  it('fires over-limit rules for saturated fat and sodium, not at the limit', () => {
+    assert.equal(recommend({ saturatedFat: 1, sodium: 1 })[0].trigger, 'All targets met');
+    const sat = triggered(recommend({ saturatedFat: 1.3 }), 'Saturated fat');
+    assert.equal(sat.trigger, 'Saturated fat at 130% of your daily limit');
+    assert.equal(sat.priority, 'high');
+    assert.match(sat.food, /Olive Oil/);
+    const salt = triggered(recommend({ sodium: 1.2 }), 'Sodium');
+    assert.equal(salt.trigger, 'Sodium at 120% of your daily limit');
+    assert.equal(salt.priority, 'medium');
+    assert.match(salt.reason, /2,300 mg/);
+  });
+
+  it('mentions sodium in the potassium advice when sodium is over its limit', () => {
+    assert.doesNotMatch(triggered(recommend({ potassium: 0.5 }), 'Potassium').reason, /over its limit/);
+    assert.match(triggered(recommend({ potassium: 0.5, sodium: 1.5 }), 'Potassium').reason, /sodium is over its limit/);
+  });
+
   it('marks gaps below 50 % and excesses above 125 % as high priority', () => {
     assert.equal(recommend({ iron: 0.4 })[0].priority, 'high');
     assert.equal(recommend({ iron: 0.6 })[0].priority, 'medium');
@@ -113,6 +130,14 @@ describe('RecommendationEngine with restrictions', () => {
     assert.match(rec.restrictionNote, /Greek Yogurt, Cottage Cheese/);
     const [vegan] = recommend({ protein: 0.5 }, 4, restrictionsFor('vegan'));
     assert.equal(vegan.food, 'Hemp Seeds', 'the alternative is filtered too');
+  });
+
+  it('filters the saturated fat and sodium advice by restrictions', () => {
+    const sat = triggered(recommend({ saturatedFat: 1.5 }, 4, ['tree_nuts', 'fish']), 'Saturated fat');
+    assert.equal(sat.food, 'Olive Oil / Avocado');
+    assert.match(sat.restrictionNote, /Walnuts, Salmon/);
+    const salt = triggered(recommend({ sodium: 1.5 }, 4, restrictionsFor('keto')), 'Sodium');
+    assert.doesNotMatch(salt.food, /Beans/);
   });
 
   it('keeps vegan vitamin B12 and D advice plant-based', () => {

@@ -1,6 +1,8 @@
+import { FOOD_COUNT } from './data/foods.js';
 import { DIETS } from './data/restrictions.js';
 import { AuthManager } from './engines/auth.js';
 import { NutritionEngine } from './engines/nutrition.js';
+import { RecipeManager } from './engines/recipe-manager.js';
 import { currentTargets, firstName, loadUserData, state } from './state.js';
 import { Storage } from './storage.js';
 import { AuthView } from './ui/auth-view.js';
@@ -55,6 +57,7 @@ export const App = {
       },
     });
     $('#year').textContent = String(new Date().getFullYear());
+    document.querySelectorAll('[data-food-count]').forEach((el) => { el.textContent = String(FOOD_COUNT); });
 
     const email = AuthManager.restoreSession();
     if (email) this.enter(email, { focus: false });
@@ -142,6 +145,8 @@ export const App = {
     AuthManager.signOut();
     Storage.scope = null;
     state.account = null;
+    state.customFoods = [];
+    RecipeManager.setCustomFoods([]);
     // Clear the previous user's rendered data from the hidden app view.
     ['#macro-list', '#micro-list', '#recommendation-list', '#targets-output', '#recipe-library', '#planner-grid', '#timeline', '#grocery-list']
       .forEach((sel) => { $(sel).innerHTML = ''; });
